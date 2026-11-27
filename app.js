@@ -15,6 +15,8 @@
   const jsonOutput = document.getElementById("json-output");
   const jsonStatus = document.getElementById("json-status");
   const downloadButton = document.getElementById("download-button");
+  const openRecordsButton = document.getElementById("open-records-button");
+  const addRecordsButton = document.getElementById("add-records-button");
   const copyButton = document.getElementById("copy-button");
   const backupCreateButton = document.getElementById("backup-create-button");
   const backupFileInput = document.getElementById("backup-file-input");
@@ -26,6 +28,15 @@
   let parsedRecords = 0;
   let isPreviewCurrent = false;
   let pendingBackupFile = null;
+  let currentRecords = [];
+  let currentWarnings = [];
+  let recordsWindow = null;
+  let recordsChannel = null;
+  let recordsWindowReady = false;
+  let recordsWindowInitialized = false;
+  let previewAddedToOverview = false;
+  let overviewRecordsSnapshot = null;
+  let recordsReadyTimer = null;
 
   function updateSourceCount() {
     const count = sourceInput.value.length;
@@ -43,18 +54,22 @@
 
   function resetPreview() {
     isPreviewCurrent = false;
+    previewAddedToOverview = false;
     downloadButton.disabled = true;
     copyButton.disabled = true;
     jsonOutput.disabled = true;
     previewEmpty.hidden = false;
     previewContent.hidden = true;
     recordCount.textContent = "Vorschau veraltet";
+    currentRecords = [];
+    currentWarnings = [];
     setStep(1);
     updateBackupButtons();
   }
 
   function showFileError(message) {
     isPreviewCurrent = false;
+    previewAddedToOverview = false;
     previewEmpty.hidden = true;
     previewContent.hidden = false;
     validationMessage.className = "validation-message has-errors";
@@ -65,6 +80,8 @@
     downloadButton.disabled = true;
     copyButton.disabled = true;
     recordCount.textContent = "Datei nicht geladen";
+    currentRecords = [];
+    currentWarnings = [];
     updateBackupButtons();
   }
 
@@ -78,6 +95,12 @@
   function updateBackupButtons() {
     backupCreateButton.disabled = !isPreviewCurrent || downloadButton.disabled;
     backupRestoreButton.disabled = !pendingBackupFile;
+    openRecordsButton.disabled = !isPreviewCurrent || downloadButton.disabled;
+    addRecordsButton.disabled = !isPreviewCurrent || downloadButton.disabled ||
+      !currentRecords.length || previewAddedToOverview;
+    addRecordsButton.textContent = previewAddedToOverview
+      ? "Bereits in Übersicht"
+      : "Datensätze zur Übersicht hinzufügen";
   }
 
   function setBackupStatus(message, state) {
@@ -94,6 +117,134 @@
     link.click();
     link.remove();
     setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+  }
+
+  function recordsMessageTarget() {
+    return window.location.protocol === "file:" ? "*" : window.location.origin;
+  }
+
+  function sendRecordsToWindow() {
+    if (!recordsWindow || recordsWindow.closed || !isPreviewCurrent) return;
+    recordsWindow.postMessage({
+      type: "prokat-records-init",
+      channel: recordsChannel,
+      records: currentRecords,
+      warnings: currentWarnings,
+      sourceName: sourceName
+    }, recordsMessageTarget());
+    overviewRecordsSnapshot = JSON.stringify(currentRecords);
+    recordsWindowInitialized = true;
+    previewAddedToOverview = true;
+    updateBackupButtons();
+  }
+
+  function openRecordsWindow() {
+    if (!isPreviewCurrent || downloadButton.disabled) return;
+    if (recordsWindow && !recordsWindow.closed) {
+      recordsWindow.focus();
+      if (recordsWindowReady && !recordsWindowInitialized) sendRecordsToWindow();
+      return;
+    }
+
+    recordsChannel = Date.now().toString(36) + "-" + Math.random().toString(36).slice(2);
+    recordsWindowReady = false;
+    recordsWindowInitialized = false;
+    const url = new URL("records.html", window.location.href);
+    url.searchParams.set("channel", recordsChannel);
+    recordsWindow = window.open(url.href, "_blank");
+    if (!recordsWindow) {
+      validationMessage.className = "validation-message has-errors";
+      validationMessage.textContent = "Der Browser hat das neue Fenster blockiert. Erlaube Pop-ups und klicke erneut auf „Einträge im neuen Fenster öffnen“ oder „Datensätze zur Übersicht hinzufügen“.";
+      openRecordsButton.disabled = false;
+      return;
+    }
+    const openingWindow = recordsWindow;
+    recordsWindow.focus();
+    recordsReadyTimer = window.setTimeout(function () {
+      if (recordsWindow !== openingWindow || recordsWindowReady) return;
+      recordsWindow = null;
+      recordsChannel = null;
+      recordsWindowReady = false;
+      recordsWindowInitialized = false;
+      validationMessage.className = "validation-message has-errors";
+      validationMessage.textContent = "Das neue Fenster wurde nicht bestätigt. Erlaube Pop-ups und klicke anschließend erneut auf „Einträge im neuen Fenster öffnen“ oder „Datensätze zur Übersicht hinzufügen“.";
+    }, 5000);
+  }
+
+  function addCurrentRecordsToOverview() {
+    if (!isPreviewCurrent || downloadButton.disabled || !currentRecords.length || previewAddedToOverview) return;
+    if (!recordsWindow || recordsWindow.closed) {
+      recordsWindow = null;
+      recordsWindowReady = false;
+      recordsWindowInitialized = false;
+      openRecordsWindow();
+      return;
+    }
+    recordsWindow.focus();
+    if (!recordsWindowReady || !recordsWindowInitialized) {
+      validationMessage.textContent = "Die Eintragsübersicht wird noch verbunden. Klicke nach dem Laden erneut auf „Datensätze zur Übersicht hinzufügen“.";
+      return;
+    }
+    recordsWindow.postMessage({
+      type: "prokat-records-append",
+      channel: recordsChannel,
+      records: currentRecords,
+      warnings: currentWarnings,
+      sourceName: sourceName
+    }, recordsMessageTarget());
+    overviewRecordsSnapshot = JSON.stringify(currentRecords);
+    previewAddedToOverview = true;
+    validationMessage.className = "validation-message";
+    validationMessage.textContent = currentRecords.length +
+      (currentRecords.length === 1 ? " Datensatz wurde" : " Datensätze wurden") +
+      " zur Eintragsübersicht hinzugefügt.";
+    updateBackupButtons();
+  }
+
+  function validWarnings(warnings) {
+    return Array.isArray(warnings) && warnings.every(function (warning) {
+      return warning && Number.isInteger(Number(warning.record)) && typeof warning.message === "string";
+    });
+  }
+
+  function receiveRecordsMessage(event) {
+    if (!recordsWindow || event.source !== recordsWindow) return;
+    if (window.location.protocol !== "file:" && event.origin !== window.location.origin) return;
+    const message = event.data;
+    if (!message || message.channel !== recordsChannel) return;
+
+    if (message.type === "prokat-records-ready") {
+      recordsWindowReady = true;
+      if (recordsReadyTimer) window.clearTimeout(recordsReadyTimer);
+      recordsReadyTimer = null;
+      validationMessage.className = "validation-message" + (currentWarnings.length ? " has-errors" : "");
+      validationMessage.textContent = currentWarnings.length
+        ? currentWarnings.length + " Hinweis" + (currentWarnings.length === 1 ? "" : "e") + " – prüfe die markierten Stellen vor dem Export."
+        : "Alle " + parsedRecords + " Datensätze wurden ohne Importhinweise erkannt.";
+      if (!recordsWindowInitialized) sendRecordsToWindow();
+      return;
+    }
+    if (message.type !== "prokat-records-updated" || !Array.isArray(message.records) ||
+        !message.records.every(function (record) { return record && typeof record === "object" && !Array.isArray(record); }) ||
+        !validWarnings(message.warnings) || !isPreviewCurrent) {
+      return;
+    }
+
+    currentRecords = message.records;
+    currentWarnings = message.warnings;
+    overviewRecordsSnapshot = JSON.stringify(currentRecords);
+    parsedRecords = currentRecords.length;
+    jsonOutput.value = JSON.stringify(currentRecords, null, 2);
+    isPreviewCurrent = true;
+    copyButton.disabled = false;
+    validationMessage.className = "validation-message";
+    validationMessage.textContent = "Änderungen aus der Eintragsübersicht übernommen.";
+    previewAddedToOverview = true;
+    recordCount.textContent = parsedRecords + (parsedRecords === 1 ? " Datensatz" : " Datensätze") +
+      (currentWarnings.length ? " · " + currentWarnings.length + (currentWarnings.length === 1 ? " Hinweis" : " Hinweise") : "");
+    setStep(2);
+    validateJson(false);
+    updateBackupButtons();
   }
 
   async function loadFile(file) {
@@ -136,6 +287,9 @@
     parsedRecords = result.records.length;
     if (!parsedRecords) {
       isPreviewCurrent = false;
+      previewAddedToOverview = false;
+      currentRecords = [];
+      currentWarnings = result.warnings;
       previewEmpty.hidden = true;
       previewContent.hidden = false;
       validationMessage.className = "validation-message has-errors";
@@ -151,6 +305,9 @@
       return;
     }
 
+    currentRecords = result.records;
+    currentWarnings = result.warnings;
+    previewAddedToOverview = false;
     previewEmpty.hidden = true;
     previewContent.hidden = false;
     jsonOutput.value = JSON.stringify(result.records, null, 2);
@@ -219,11 +376,21 @@
       sampleButton.disabled = false;
     }
   });
-  previewButton.addEventListener("click", generatePreview);
+  previewButton.addEventListener("click", function () {
+    generatePreview();
+    openRecordsWindow();
+  });
+  openRecordsButton.addEventListener("click", openRecordsWindow);
+  addRecordsButton.addEventListener("click", addCurrentRecordsToOverview);
   jsonOutput.addEventListener("input", function () {
-    validateJson(false);
+    const valid = validateJson(false);
+    if (valid) {
+      currentRecords = JSON.parse(jsonOutput.value);
+      previewAddedToOverview = JSON.stringify(currentRecords) === overviewRecordsSnapshot;
+    }
     updateBackupButtons();
   });
+  window.addEventListener("message", receiveRecordsMessage);
   downloadButton.addEventListener("click", function () {
     if (!validateJson(true)) return;
     downloadBlob(new Blob([jsonOutput.value], { type: "application/json;charset=utf-8" }), sourceName + ".json");
@@ -292,6 +459,8 @@
       sourceInput.value = payload.sourceText;
       sourceName = safeFileName(payload.sourceName, "tustep-export");
       updateSourceCount();
+      currentRecords = payload.records;
+      currentWarnings = sourceResult.warnings;
       parsedRecords = payload.records.length;
       previewEmpty.hidden = true;
       previewContent.hidden = false;
@@ -306,6 +475,7 @@
         (sourceResult.warnings.length ? " · " + sourceResult.warnings.length + (sourceResult.warnings.length === 1 ? " Hinweis" : " Hinweise") : "");
       copyButton.disabled = false;
       isPreviewCurrent = true;
+      previewAddedToOverview = false;
       setStep(2);
       validateJson(false);
       setBackupStatus("Backup geladen. Du kannst Quelltext und JSON weiterbearbeiten.", "success");

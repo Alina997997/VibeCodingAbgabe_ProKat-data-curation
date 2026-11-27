@@ -40,10 +40,11 @@ Die lokale WebApp liest TUSTEP-Textdateien ein und wandelt die erkannten Datens�
 
 1. Starte den lokalen Webserver wie unten beschrieben und öffne `http://localhost:8000`.
 2. Lade eine `.txt`-Datei hoch, ziehe sie in das Dateifeld oder füge TUSTEP-Code direkt in das Quelltextfeld ein. Mit **Beispieldaten laden** kannst du den mitgelieferten Beispieldatensatz öffnen.
-3. Erzeuge die Vorschau. Sie enthält alle erkannten Datensätze und weist auf unbekannte oder nicht eindeutig lesbare Zeilen hin. Der Quelltext kann korrigiert und die Vorschau erneut erzeugt werden; auch das JSON selbst lässt sich vor dem Export bearbeiten.
-4. Lade das JSON herunter. Der Export ist nur möglich, solange das JSON syntaktisch gültig ist.
+3. Erzeuge die Vorschau. Bei erfolgreichem Import öffnet sich die Eintragsübersicht in einem neuen Fenster. Falls der Browser das Pop-up blockiert, erlaube Pop-ups für die lokale Website und klicke auf **Einträge im neuen Fenster öffnen**. Dort kannst du Datensätze suchen und filtern, Hinweise prüfen und Einträge im Formular bearbeiten. Die vollständigen JSON-Daten eines Eintrags lassen sich bei Bedarf einblenden und bearbeiten.
+4. Mit **Datensätze zur Übersicht hinzufügen** kannst du ein weiteres TUSTEP-Ergebnis an eine bereits geöffnete Übersicht anhängen. In der Übersicht kannst du außerdem über **JSON-Datei hinzufügen** ein einzelnes JSON-Objekt oder ein JSON-Array importieren. Die Schaltfläche **Zum TUSTEP-Konverter** führt zurück zur Importseite.
+5. Exportiere aus der Übersicht die gerade sichtbaren Datensätze als JSON. Der Konverter bietet zusätzlich den Export des vollständigen JSON-Arrays.
 
-Import, Umwandlung und Verschlüsselung laufen im Browser. TUSTEP- und JSON-Daten werden nicht an einen Server übertragen. Die Beispieldatei wird vom lokalen Webserver geladen.
+Import, Umwandlung, Bearbeitung und Backup laufen im Browser. TUSTEP- und JSON-Daten werden nicht an einen Server übertragen. Die Beispieldatei wird vom lokalen Webserver geladen.
 
 ### Lokales Backup für einen Rechnerwechsel
 

@@ -1,0 +1,159 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f7f3">
+  <title>ProKat · Eintragsübersicht</title>
+  <link rel="stylesheet" href="records.css">
+  <script src="records.js" defer></script>
+</head>
+<body>
+  <header class="records-topbar">
+    <a class="brand" href="./" aria-label="ProKat Startseite">
+      <span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span><span></span></span>
+      <span>prokat<span class="brand-divider">/</span><span class="brand-section">Datenwerkstatt</span></span>
+    </a>
+    <div class="topbar-actions">
+      <span id="connection-status" class="connection-status">Warte auf Datensätze …</span>
+      <a class="button button-secondary" href="./index.html">Zum TUSTEP-Konverter</a>
+      <button id="close-window" class="button button-secondary" type="button">Fenster schließen</button>
+    </div>
+  </header>
+
+  <main class="records-shell">
+    <section class="intro">
+      <div class="eyebrow"><span class="eyebrow-line"></span> PROKAT · DATENÜBERSICHT</div>
+      <h1>Einträge <span>prüfen.</span></h1>
+      <p class="intro-copy">Suche und filtere die importierten Personen. Wähle einen Eintrag, um ihn im Formular zu prüfen und bei Bedarf anzupassen.</p>
+    </section>
+
+    <section class="stats-grid" aria-label="Fehlerstatistik">
+      <article class="stat-card">
+        <span class="stat-label">Datensätze gesamt</span>
+        <strong id="stat-total">–</strong>
+        <span class="stat-caption">eingelesene Einträge</span>
+      </article>
+      <article class="stat-card stat-card-alert">
+        <span class="stat-label">Einträge mit Hinweisen</span>
+        <strong id="stat-affected">–</strong>
+        <span class="stat-caption">müssen geprüft werden</span>
+      </article>
+      <article class="stat-card">
+        <span class="stat-label">Importprobleme</span>
+        <strong id="stat-import">–</strong>
+        <span class="stat-caption">Zeilen oder Felder</span>
+      </article>
+      <article class="stat-card">
+        <span class="stat-label">Formatprobleme</span>
+        <strong id="stat-format">–</strong>
+        <span class="stat-caption">Datum, Ort oder Zeitraum</span>
+      </article>
+    </section>
+
+    <section class="toolbar" aria-label="Suche und Filter">
+      <label class="search-control" for="search-input">
+        <svg viewBox="0 0 20 20" aria-hidden="true"><circle cx="8.5" cy="8.5" r="5.5"/><path d="m13 13 4 4"/></svg>
+        <input id="search-input" type="search" placeholder="Name, PIT, Fakultät oder Text suchen …" autocomplete="off">
+      </label>
+      <label class="filter-control" for="issue-filter">
+        <span>Filter</span>
+        <select id="issue-filter">
+          <option value="all">Alle Einträge</option>
+          <option value="issues">Mit Hinweisen</option>
+          <option value="import">Importprobleme</option>
+          <option value="format">Formatprobleme</option>
+        </select>
+      </label>
+      <button id="import-json-button" class="button button-secondary" type="button">JSON-Datei hinzufügen</button>
+      <input id="import-json-input" class="visually-hidden" type="file" accept=".json,application/json" aria-label="JSON-Datei auswählen">
+      <button id="export-filtered" class="button button-primary" type="button" disabled>
+        Sichtbare Einträge als JSON exportieren
+        <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3v10m0 0 3.5-3.5M10 13 6.5 9.5M4 14v2.5A.5.5 0 0 0 4.5 17h11a.5.5 0 0 0 .5-.5V14"/></svg>
+      </button>
+    </section>
+
+    <div class="records-layout">
+      <section class="table-panel" aria-labelledby="table-title">
+        <div class="panel-heading">
+          <div>
+            <div class="panel-kicker">01 · TREFFERLISTE</div>
+            <h2 id="table-title">Personen</h2>
+          </div>
+          <span id="visible-count" class="count-badge">0 Einträge</span>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th scope="col">PIT</th>
+                <th scope="col">Name</th>
+                <th scope="col">Geschlecht</th>
+                <th scope="col">Kurzcharakterisierung</th>
+                <th scope="col">Prüfung</th>
+              </tr>
+            </thead>
+            <tbody id="records-body"></tbody>
+          </table>
+          <div id="list-empty" class="list-empty" hidden>Keine Einträge entsprechen der Suche oder dem Filter.</div>
+        </div>
+        <p id="records-notice" class="records-notice" role="status" aria-live="polite"></p>
+      </section>
+
+      <section class="detail-panel" aria-labelledby="detail-heading">
+        <div id="detail-empty" class="detail-empty">
+          <div class="empty-art" aria-hidden="true"><span>{</span><i></i><span>}</span></div>
+          <strong>Ein Eintrag wird hier angezeigt</strong>
+          <p>Wähle eine Person aus der Liste aus, um Angaben und mögliche Hinweise zu sehen.</p>
+        </div>
+        <div id="detail-view" hidden>
+          <div class="panel-kicker">02 · EINZELDATENSATZ</div>
+          <div class="identity">
+            <div id="dummy-photo" class="dummy-photo" aria-label="Symbolisches Dummy-Foto">
+              <svg viewBox="0 0 100 100" aria-hidden="true">
+                <circle class="portrait-hair" cx="50" cy="34" r="21"/>
+                <path class="portrait-face" d="M31 38c0-15 8-24 19-24s19 9 19 24v8c0 12-9 22-19 22S31 58 31 46z"/>
+                <path class="portrait-hair" d="M29 40c-2-19 8-31 22-31 13 0 22 10 21 27-6-2-11-8-13-14-6 7-17 11-30 11z"/>
+                <path class="portrait-body" d="M17 100c2-20 14-31 33-31s31 11 33 31z"/>
+              </svg>
+              <span id="photo-caption">Dummy-Foto</span>
+            </div>
+            <div class="identity-copy">
+              <span id="detail-pit" class="identity-pit">PIT –</span>
+              <h2 id="detail-heading">Person</h2>
+              <p id="detail-years" class="detail-years"></p>
+              <span id="detail-issue-badge" class="issue-badge" hidden></span>
+            </div>
+          </div>
+
+          <section id="record-issues" class="record-issues" aria-live="polite"></section>
+
+          <form id="record-form" class="record-form">
+            <div class="form-section-heading">
+              <h3>Personendaten</h3>
+              <span>Änderungen werden direkt übernommen</span>
+            </div>
+            <div id="form-fields" class="form-fields"></div>
+          </form>
+
+          <div id="additional-sections" class="additional-sections"></div>
+
+          <details class="json-details">
+            <summary>JSON dieses Eintrags anzeigen / bearbeiten</summary>
+            <p class="json-help">Bearbeite bei Bedarf den vollständigen Datensatz. Änderungen werden erst mit „JSON-Änderungen übernehmen“ gespeichert.</p>
+            <textarea id="record-json-editor" class="json-editor" spellcheck="false" aria-label="JSON des ausgewählten Datensatzes"></textarea>
+            <div class="json-actions">
+              <span id="record-json-status" class="json-status">JSON nicht geändert</span>
+              <button id="apply-json" class="button button-secondary" type="button">JSON-Änderungen übernehmen</button>
+            </div>
+          </details>
+        </div>
+      </section>
+    </div>
+    <footer class="records-footer">
+      <span>Alle Änderungen bleiben in dieser Browser-Sitzung.</span>
+      <span>Zum dauerhaften Speichern das Backup im Konverter herunterladen.</span>
+    </footer>
+  </main>
+</body>
+</html>
