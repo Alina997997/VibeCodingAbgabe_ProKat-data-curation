@@ -52,6 +52,18 @@ In der Eintragsübersicht erstellt **Karte erstellen** eine Karte aus den aktuel
 
 Die Karte benötigt eine Internetverbindung. Für die Ortssuche wird [Photon](https://photon.komoot.io/) mit OpenStreetMap-Daten verwendet; die Kartenkacheln liefert [OpenStreetMap Deutschland](https://tile.openstreetmap.de/) auf Grundlage von [OpenStreetMap-Daten](https://www.openstreetmap.org/copyright). An den Ortsdienst werden nur eindeutige Ortsnamen gesendet, keine Namen von Personen, PITs oder Biografietexte. Die Anfragen erfolgen einzeln und höchstens einmal pro Sekunde; Suchergebnisse werden lokal im Browser zwischengespeichert. Eindeutige Namens-Treffer erscheinen als Vorschläge; mehrdeutige Treffer müssen ausgewählt werden, nicht gefundene Orte bleiben unverortet. Koordinaten sind externe Vorschläge und werden nicht in die JSON-Datensätze übernommen.
 
+### Verwandtschaftsgrafik
+
+In der Detailansicht öffnet **Verwandtschaft anzeigen** eine schreibgeschützte Ansicht zu den im Datensatz genannten Eltern, Ehepartnern und Kindern. Ein anderer Eintrag wird nur dann automatisch verknüpft, wenn sein Name oder eine Namensvariante eindeutig passt. Bei mehreren passenden Einträgen ist eine manuelle Auswahl nötig; fehlende oder nicht eindeutig passende Personen bleiben unverknüpft. Die Grafik ändert keine Datensatzangaben.
+
+### Auswertungen und Visualisierungen
+
+Über **Auswertungen** in der Eintragsübersicht stehen Kennzahlen zur Datenvollständigkeit, Geburtsjahrzehnte und Fakultätsverteilungen, ein auswählbarer Lebens- und Karriere-Zeitstrahl pro Person sowie ein akademisches Netzwerk nach Fakultät zur Verfügung. Personen im Netzwerk lassen sich anklicken, um ihren Datensatz in der Übersicht aufzurufen.
+
+Die Geschlechterverteilungen für Arbeitspositionen und Fakultäten werden getrennt nach Jahrzehnten dargestellt. Sie beziehen sich auf alle geladenen Datensätze, nicht nur auf aktuell sichtbare oder gefilterte Einträge. Positionen werden ausschließlich aus klar erkennbaren Titeln in „(12) Berufslaufbahn“ gruppiert; nicht erkannte und nicht datierbare Einträge werden gezählt, aber nicht einer Position oder einem Zeitraum zugeordnet. Die Originalangaben bleiben unverändert. Ausdrücklich angegebene Zeiträume werden jedem überlappenden Jahrzehnt zugeordnet; pro Datensatz, Kategorie und Jahrzehnt wird höchstens einmal gezählt. Fakultäten werden nicht mit Positionen verknüpft, da die Daten diese Zuordnung nicht durchgehend belegen. Unbekannte oder andere Geschlechtsangaben erscheinen separat und gehen nicht in die Prozentwerte für Männer und Frauen ein.
+
+Alle Visualisierungen sind lesende Auswertungen: Sie ändern weder die Quelldatensätze noch ergänzen sie fehlende Angaben. Nicht auswertbare Jahreszahlen und Zuordnungen werden nicht geschätzt.
+
 ### Lokales Backup für einen Rechnerwechsel
 
 1. Erzeuge eine gültige JSON-Vorschau und klicke auf **Backup herunterladen**. Die `.prokat-backup.json`-Datei enthält sowohl den TUSTEP-Quelltext als auch das aktuelle JSON.

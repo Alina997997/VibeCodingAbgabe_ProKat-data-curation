@@ -74,6 +74,7 @@
       <button id="import-json-button" class="button button-secondary" type="button">JSON-Datei hinzufügen</button>
       <input id="import-json-input" class="visually-hidden" type="file" accept=".json,application/json" aria-label="JSON-Datei auswählen">
       <button id="create-map" class="button button-secondary" type="button" title="Erstellt eine Karte aus den aktuell sichtbaren Einträgen; Internet erforderlich." disabled>Karte erstellen</button>
+      <button id="open-analytics" class="button button-secondary" type="button" disabled>Auswertungen</button>
       <button id="export-filtered" class="button button-primary" type="button" disabled>
         Sichtbare Einträge als JSON exportieren
         <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3v10m0 0 3.5-3.5M10 13 6.5 9.5M4 14v2.5A.5.5 0 0 0 4.5 17h11a.5.5 0 0 0 .5-.5V14"/></svg>
@@ -134,6 +135,7 @@
           </div>
           <div class="detail-actions">
             <button id="create-person-map" class="button button-secondary" type="button" title="Erstellt eine Karte nur mit den Orten dieses Datensatzes; Internet erforderlich.">Karte für diese Person erstellen</button>
+            <button id="show-family-graph" class="button button-secondary" type="button" title="Zeigt belegte Angaben zu Eltern, Ehepartnern und Kindern und verknüpft passende Datensätze.">Verwandtschaft anzeigen</button>
           </div>
 
           <section id="record-issues" class="record-issues" aria-live="polite"></section>
@@ -187,6 +189,90 @@
             <p>Gestrichelte Markierungen sind mehrdeutig. Wähle hier den passenden Ort ausdrücklich aus.</p>
             <div id="map-unresolved" class="map-unresolved"></div>
           </aside>
+        </div>
+      </div>
+    </dialog>
+
+    <dialog id="family-dialog" class="family-dialog" aria-labelledby="family-title">
+      <div class="family-dialog-inner">
+        <header class="map-dialog-header">
+          <div>
+            <div class="panel-kicker">04 · FAMILIENBEZIEHUNGEN</div>
+            <h2 id="family-title">Verwandtschaft</h2>
+          </div>
+          <button id="close-family" class="button button-secondary" type="button">Schließen</button>
+        </header>
+        <p class="family-notice">
+          Angezeigt werden nur Angaben aus den Beziehungsfeldern des Datensatzes. Andere Einträge werden nur bei einem eindeutigen Namens- oder Namensvarianten-Treffer verknüpft; mehrere Treffer musst du auswählen. Nicht gefundene Personen bleiben unverknüpft.
+        </p>
+        <p id="family-status" class="family-status" role="status" aria-live="polite"></p>
+        <div id="family-graph" class="family-network"></div>
+      </div>
+    </dialog>
+
+    <dialog id="analytics-dialog" class="analytics-dialog" aria-labelledby="analytics-title">
+      <div class="analytics-dialog-inner">
+        <header class="map-dialog-header">
+          <div>
+            <div class="panel-kicker">05 · DATENBILDER</div>
+            <h2 id="analytics-title">Auswertungen</h2>
+          </div>
+          <button id="close-analytics" class="button button-secondary" type="button">Schließen</button>
+        </header>
+        <p class="analytics-notice">
+          Die Auswertungen verwenden alle geladenen Datensätze. Fehlende oder nicht eindeutig datierbare Angaben werden nicht ergänzt. Unbekannte Geschlechter erscheinen separat und gehen nicht in Männer-/Frauen-Prozentwerte ein. Fakultätszugehörigkeiten und Berufslaufbahnen werden getrennt ausgewertet; die Daten belegen nicht durchgehend, welche Position zu welcher Fakultät gehört.
+        </p>
+        <div id="analytics-summary" class="analytics-summary" aria-label="Bestandsübersicht"></div>
+        <div class="analytics-sections">
+          <section class="analytics-section" aria-labelledby="quality-title">
+            <h3 id="quality-title">Datenvollständigkeit</h3>
+            <div id="completeness-chart" class="analytics-table"></div>
+          </section>
+          <section class="analytics-section" aria-labelledby="distribution-title">
+            <h3 id="distribution-title">Verteilungen</h3>
+            <div class="analytics-two-columns">
+              <div>
+                <h4>Geburtsjahrzehnte</h4>
+                <div id="birth-decade-chart" class="analytics-bars"></div>
+              </div>
+              <div>
+                <h4>Fakultätszugehörigkeiten</h4>
+                <div id="faculty-distribution-chart" class="analytics-bars"></div>
+              </div>
+            </div>
+          </section>
+          <section class="analytics-section" aria-labelledby="timeline-title">
+            <h3 id="timeline-title">Lebens- und Karriere-Zeitstrahl</h3>
+            <label class="analytics-filter" for="timeline-person-select">Person
+              <select id="timeline-person-select"></select>
+            </label>
+            <div id="person-timeline" class="person-timeline"></div>
+            <div id="timeline-undated" class="timeline-undated"></div>
+          </section>
+          <section class="analytics-section" aria-labelledby="gender-position-title">
+            <h3 id="gender-position-title">Geschlecht nach Arbeitsposition und Jahrzehnt</h3>
+            <p class="analytics-explanation">Grundlage sind ausdrücklich datierte Angaben in „(12) Berufslaufbahn“. Eindeutige Titelvarianten werden gruppiert; die Originaltexte bleiben unverändert in den Datensätzen. Gezählt wird jeder Datensatz pro Position und Jahrzehnt höchstens einmal.</p>
+            <label class="analytics-filter" for="gender-position-select">Arbeitsposition
+              <select id="gender-position-select"></select>
+            </label>
+            <div id="gender-position-chart" class="gender-chart"></div>
+          </section>
+          <section class="analytics-section" aria-labelledby="gender-faculty-title">
+            <h3 id="gender-faculty-title">Geschlecht nach Fakultät und Jahrzehnt</h3>
+            <p class="analytics-explanation">Grundlage sind die expliziten Zeiträume in „(2+3) Fakultätszugehörigkeit“. Das Diagramm verknüpft Fakultäten nicht mit den Arbeitspositionen. Personen mit unbekanntem Geschlecht werden separat gezählt.</p>
+            <label class="analytics-filter" for="gender-faculty-select">Fakultät
+              <select id="gender-faculty-select"></select>
+            </label>
+            <div id="gender-faculty-chart" class="gender-chart"></div>
+          </section>
+          <section class="analytics-section" aria-labelledby="faculty-network-title">
+            <h3 id="faculty-network-title">Akademisches Netzwerk</h3>
+            <p class="analytics-explanation">Personen werden nur über identische, ausdrücklich angegebene Fakultätsnamen gruppiert. Die Gruppierung belegt eine gemeinsame Zuordnung, aber nicht automatisch persönlichen Kontakt.</p>
+            <label class="analytics-filter" for="faculty-network-select">Fakultät
+              <select id="faculty-network-select"></select>
+            </label>
+            <div id="faculty-network" class="faculty-network"></div>
+          </section>
         </div>
       </div>
     </dialog>

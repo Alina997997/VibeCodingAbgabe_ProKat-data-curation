@@ -28,12 +28,34 @@
   const applyJsonButton = document.getElementById("apply-json");
   const createMapButton = document.getElementById("create-map");
   const createPersonMapButton = document.getElementById("create-person-map");
+  const showFamilyGraphButton = document.getElementById("show-family-graph");
   const mapDialog = document.getElementById("map-dialog");
   const mapTitle = document.getElementById("map-title");
   const mapStatus = document.getElementById("map-status");
   const mapElement = document.getElementById("places-map");
   const mapUnresolved = document.getElementById("map-unresolved");
   const closeMapButton = document.getElementById("close-map");
+  const familyDialog = document.getElementById("family-dialog");
+  const familyTitle = document.getElementById("family-title");
+  const familyStatus = document.getElementById("family-status");
+  const familyGraph = document.getElementById("family-graph");
+  const closeFamilyButton = document.getElementById("close-family");
+  const openAnalyticsButton = document.getElementById("open-analytics");
+  const analyticsDialog = document.getElementById("analytics-dialog");
+  const closeAnalyticsButton = document.getElementById("close-analytics");
+  const analyticsSummary = document.getElementById("analytics-summary");
+  const completenessChart = document.getElementById("completeness-chart");
+  const birthDecadeChart = document.getElementById("birth-decade-chart");
+  const facultyDistributionChart = document.getElementById("faculty-distribution-chart");
+  const timelinePersonSelect = document.getElementById("timeline-person-select");
+  const personTimeline = document.getElementById("person-timeline");
+  const timelineUndated = document.getElementById("timeline-undated");
+  const genderPositionSelect = document.getElementById("gender-position-select");
+  const genderPositionChart = document.getElementById("gender-position-chart");
+  const genderFacultySelect = document.getElementById("gender-faculty-select");
+  const genderFacultyChart = document.getElementById("gender-faculty-chart");
+  const facultyNetworkSelect = document.getElementById("faculty-network-select");
+  const facultyNetwork = document.getElementById("faculty-network");
   const stats = {
     total: document.getElementById("stat-total"),
     affected: document.getElementById("stat-affected"),
@@ -68,6 +90,36 @@
     { title: "Familie", keys: ["(8+9) Eltern", "(10) Ehepartner", "(10a) Kinder"] },
     { title: "Werdegang und Ämter", keys: ["(11) Bildungsgang", "(12) Berufslaufbahn", "(13) Akademische-Ämter", "(14) Titel", "(15) Mitgliedschaft Wissenschaft", "(15a) Mitgliedschaft Studium"] },
     { title: "Quellen und Nachweise", keys: ["(17) Archivalische-Quellen", "(18) Literatur", "(18a) Online-Quellen", "(19) Bildnachweise", "(20) Bemerkungen", "(21) Bearbeiter", "(23) BIB", "(24) GND"] }
+  ];
+  const positionRules = [
+    { label: "Prorektor", pattern: /\bProrektor(?:in)?\b/i },
+    { label: "Rektor", pattern: /\bRektor(?:in)?\b/i },
+    { label: "Professor", pattern: /\b(?:(?:o|ao|apl)\.\s*)?Prof(?:essor(?:in)?)(?:\.|(?=\s|$))|\b(?:(?:o|ao|apl)\.\s*)?Prof(?=\.|\b)|\b(?:Universitäts|Gymnasial)professor(?:in)?\b/i },
+    { label: "Privatdozent", pattern: /\b(?:PDoz(?=\.|\b)|Privatdozent(?:in)?\b)/i },
+    { label: "Dozent", pattern: /\b(?:Diätendoz(?=\.|\b)|Dozent(?:in)?\b)/i },
+    { label: "Wissenschaftliche Assistenz", pattern: /\bWiss\.\s*Ass\.?\b/i },
+    { label: "Wissenschaftlicher Rat", pattern: /\bWiss\.\s*(?:Rat|Rätin)\b/i },
+    { label: "Dekan", pattern: /\bDekan(?:in)?\b/i },
+    { label: "Direktor", pattern: /\bDirektor(?:in)?\b/i },
+    { label: "Leitung", pattern: /\bLeiter(?:in)?\b/i },
+    { label: "Generalsuperintendent", pattern: /\bGeneralsuperintendent(?:in)?\b/i },
+    { label: "Superintendent", pattern: /\bSuperintendent(?:in)?\b/i },
+    { label: "Prälat", pattern: /\bPrälat(?:in)?\b/i },
+    { label: "Pädagogarch", pattern: /\bPädagogarch(?:in)?\b/i },
+    { label: "Repetent", pattern: /\bRepetent(?:in)?\b/i },
+    { label: "Vikar", pattern: /\bVikar(?:in)?\b/i },
+    { label: "Priester", pattern: /\bPriester\b/i },
+    { label: "Pfarrer", pattern: /\b(?:Stadt)?pfarrer(?:in)?\b/i },
+    { label: "Diakon", pattern: /\bDiakon(?:in)?\b/i },
+    { label: "Lehrkraft", pattern: /\bLehrer(?:in)?\b/i },
+    { label: "Förster", pattern: /\b(?:(?:Revier|Ober)?förster)(?:in)?\b/i },
+    { label: "Feldjäger", pattern: /\bFeldjäger\b/i },
+    { label: "Reinigungskraft", pattern: /\bReinigungskraft\b/i },
+    { label: "Bibliothekar", pattern: /\bBibliothekar(?:in)?\b/i },
+    { label: "Archivar", pattern: /\bArchivar(?:in)?\b/i },
+    { label: "Stadtschreiber", pattern: /\bStadtschreiber(?:in)?\b/i },
+    { label: "Oberamtmann", pattern: /\bOberamtmann\b/i },
+    { label: "Kanzler", pattern: /\bKanzler(?:in)?\b/i }
   ];
   const editableFieldPaths = new Set(editableFields.map(function (field) {
     return JSON.stringify(field.path);
@@ -127,6 +179,773 @@
   function fullName(record) {
     const name = record["(1) Name"] || {};
     return [name.Vorname, name.Nachname].filter(Boolean).join(" ") || name["Unaufgeteilter Name"] || "Name fehlt";
+  }
+
+  function normalizeFamilyName(value) {
+    return String(value || "").normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLocaleLowerCase("de")
+      .replace(/[.,;:()]/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  function addFamilyNameKey(keys, value) {
+    const key = normalizeFamilyName(value);
+    if (key) keys.add(key);
+  }
+
+  function recordFamilyNameKeys(record) {
+    const keys = new Set();
+    const name = record["(1) Name"] || {};
+    const first = name.Vorname || "";
+    const last = name.Nachname || "";
+    [fullName(record), name["Unaufgeteilter Name"], first + " " + last, last + " " + first, last + ", " + first]
+      .forEach(function (value) { addFamilyNameKey(keys, value); });
+    const variants = record["(1*) Namensvarianten"];
+    if (Array.isArray(variants)) {
+      variants.forEach(function (variant) {
+        if (!variant || typeof variant !== "object") return;
+        const variantFirst = variant.Vorname || "";
+        const variantLast = variant.Nachname || "";
+        [
+          variant["Unaufgeteilter Name"],
+          variantFirst + " " + variantLast,
+          variantLast + " " + variantFirst,
+          variantLast + ", " + variantFirst
+        ].forEach(function (value) { addFamilyNameKey(keys, value); });
+      });
+    }
+    return keys;
+  }
+
+  function relationshipNameKeys(value) {
+    const text = String(value || "").trim();
+    const keys = new Set();
+    addFamilyNameKey(keys, text);
+    const commaIndex = text.indexOf(",");
+    if (commaIndex > 0) addFamilyNameKey(keys, text.slice(0, commaIndex));
+    return keys;
+  }
+
+  function findFamilyRecordMatches(value, currentIndex) {
+    const relationKeys = relationshipNameKeys(value);
+    if (!relationKeys.size) return [];
+    return records.map(function (record, index) {
+      if (index === currentIndex) return -1;
+      const names = recordFamilyNameKeys(record);
+      return Array.from(relationKeys).some(function (key) { return names.has(key); }) ? index : -1;
+    }).filter(function (index) { return index >= 0; });
+  }
+
+  function familyRelationGroups(record) {
+    const parents = record["(8+9) Eltern"] || {};
+    const parentRelations = ["Vater", "Mutter"].map(function (role) {
+      return { role: role, name: parents[role], detail: "" };
+    }).filter(function (relation) { return typeof relation.name === "string" && relation.name.trim(); });
+
+    const spouseValue = record["(10) Ehepartner"];
+    const spouses = Array.isArray(spouseValue) ? spouseValue : spouseValue ? [spouseValue] : [];
+    const spouseRelations = spouses.map(function (spouse) {
+      if (typeof spouse === "string") return { role: "Ehepartner", name: spouse, detail: "" };
+      if (!spouse || typeof spouse !== "object") return null;
+      return {
+        role: "Ehepartner",
+        name: spouse.Name || "",
+        detail: spouse.Eheschließung ? "Eheschließung: " + spouse.Eheschließung : ""
+      };
+    }).filter(function (relation) { return relation && relation.name.trim(); });
+
+    const childValue = record["(10a) Kinder"];
+    const children = Array.isArray(childValue) ? childValue : childValue ? [childValue] : [];
+    const childRelations = children.map(function (child) {
+      if (typeof child === "string") return { role: "Kind", name: child, detail: "" };
+      if (!child || typeof child !== "object") return null;
+      const childName = child.Name || [child.Vorname, child.Nachname].filter(Boolean).join(" ");
+      return childName ? { role: "Kind", name: childName, detail: "" } : null;
+    }).filter(Boolean);
+
+    return [
+      { title: "Eltern", relations: parentRelations },
+      { title: "Ehepartner", relations: spouseRelations },
+      { title: "Kinder", relations: childRelations }
+    ];
+  }
+
+  function familyCandidateLabel(index) {
+    const record = records[index];
+    const pit = record && record["(1) Name"] && record["(1) Name"].PIT;
+    return fullName(record) + (pit ? " · PIT " + pit : "");
+  }
+
+  function navigateToFamilyRecord(index) {
+    if (!records[index]) return;
+    searchInput.value = "";
+    issueFilter.value = "all";
+    selectedIndex = index;
+    renderTable();
+    renderFamilyGraph(index);
+    const rowPosition = visibleIndices.indexOf(index);
+    if (rowPosition >= 0 && recordsBody.children[rowPosition]) {
+      recordsBody.children[rowPosition].scrollIntoView({ block: "nearest" });
+    }
+  }
+
+  function renderFamilyRelation(relation, currentIndex) {
+    const card = document.createElement("article");
+    card.className = "family-relation";
+    const role = document.createElement("span");
+    role.className = "family-relation-role";
+    role.textContent = relation.role;
+    const name = document.createElement("strong");
+    name.className = "family-relation-name";
+    name.textContent = relation.name;
+    card.append(role, name);
+    if (relation.detail) {
+      const detail = document.createElement("p");
+      detail.className = "family-relation-detail";
+      detail.textContent = relation.detail;
+      card.append(detail);
+    }
+
+    const matches = findFamilyRecordMatches(relation.name, currentIndex);
+    if (matches.length === 1) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "button button-secondary family-open-button";
+      button.textContent = "Eintrag öffnen · " + familyCandidateLabel(matches[0]);
+      button.addEventListener("click", function () { navigateToFamilyRecord(matches[0]); });
+      card.append(button);
+    } else if (matches.length > 1) {
+      const prompt = document.createElement("p");
+      prompt.className = "family-relation-detail";
+      prompt.textContent = "Mehrere passende Einträge; wähle den richtigen aus.";
+      const select = document.createElement("select");
+      select.className = "family-candidate-select";
+      select.setAttribute("aria-label", "Passenden Datensatz für " + relation.role + " auswählen");
+      const placeholder = document.createElement("option");
+      placeholder.value = "";
+      placeholder.textContent = "Datensatz auswählen …";
+      select.append(placeholder);
+      matches.forEach(function (index) {
+        const option = document.createElement("option");
+        option.value = String(index);
+        option.textContent = familyCandidateLabel(index);
+        select.append(option);
+      });
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "button button-secondary family-open-button";
+      button.textContent = "Ausgewählten Datensatz öffnen";
+      button.disabled = true;
+      select.addEventListener("change", function () { button.disabled = select.value === ""; });
+      button.addEventListener("click", function () {
+        if (select.value !== "") navigateToFamilyRecord(Number(select.value));
+      });
+      card.append(prompt, select, button);
+    } else {
+      const note = document.createElement("p");
+      note.className = "family-relation-detail";
+      note.textContent = "Kein eindeutiger Namens-Treffer in den geladenen Datensätzen; die Quellangabe bleibt unverknüpft.";
+      card.append(note);
+    }
+    return card;
+  }
+
+  function renderFamilyGraph(recordIndex) {
+    const record = records[recordIndex];
+    if (!record) return;
+    familyTitle.textContent = "Verwandtschaft von " + fullName(record);
+    familyGraph.replaceChildren();
+
+    const root = document.createElement("article");
+    root.className = "family-node family-root-node";
+    const rootLabel = document.createElement("span");
+    rootLabel.className = "family-relation-role";
+    rootLabel.textContent = "Ausgewählte Person";
+    const rootName = document.createElement("strong");
+    rootName.className = "family-relation-name";
+    rootName.textContent = fullName(record);
+    root.append(rootLabel, rootName);
+    const pit = record["(1) Name"] && record["(1) Name"].PIT;
+    if (pit) {
+      const rootPit = document.createElement("span");
+      rootPit.className = "family-relation-detail";
+      rootPit.textContent = "PIT " + pit;
+      root.append(rootPit);
+    }
+    familyGraph.append(root);
+
+    const groups = familyRelationGroups(record);
+    const groupContainer = document.createElement("div");
+    groupContainer.className = "family-relations";
+    let relationCount = 0;
+    groups.forEach(function (group) {
+      const section = document.createElement("section");
+      section.className = "family-group";
+      const heading = document.createElement("h3");
+      heading.textContent = group.title;
+      const cards = document.createElement("div");
+      cards.className = "family-relation-list";
+      if (!group.relations.length) {
+        const empty = document.createElement("p");
+        empty.className = "family-empty";
+        empty.textContent = "Keine Angabe im Datensatz.";
+        cards.append(empty);
+      }
+      group.relations.forEach(function (relation) {
+        relationCount += 1;
+        cards.append(renderFamilyRelation(relation, recordIndex));
+      });
+      section.append(heading, cards);
+      groupContainer.append(section);
+    });
+    familyGraph.append(groupContainer);
+    familyStatus.textContent = relationCount
+      ? relationCount + " Beziehungsangaben aus dem ausgewählten Datensatz. Nicht geladene oder nicht eindeutig passende Personen bleiben unverknüpft."
+      : "Für diese Person sind keine Eltern-, Ehepartner- oder Kinderangaben im Datensatz vorhanden.";
+  }
+
+  function openFamilyGraph() {
+    if (selectedIndex < 0 || !records[selectedIndex]) return;
+    renderFamilyGraph(selectedIndex);
+    familyDialog.showModal();
+  }
+
+  function analysisText(value) {
+    return typeof value === "string" ? value.trim() : "";
+  }
+
+  function hasAnalysisValue(value) {
+    if (typeof value === "string") return value.trim() !== "";
+    if (typeof value === "number") return Number.isFinite(value);
+    if (Array.isArray(value)) return value.some(hasAnalysisValue);
+    if (value && typeof value === "object") return Object.keys(value).some(function (key) {
+      return hasAnalysisValue(value[key]);
+    });
+    return false;
+  }
+
+  function exactYear(value) {
+    const text = analysisText(value);
+    if (!/^\d{3,4}$/.test(text)) return null;
+    const year = Number(text);
+    return year > 0 ? year : null;
+  }
+
+  function leadingYearRange(value) {
+    const text = analysisText(value);
+    const match = text.match(/^(\d{3,4})(?:\s*[-–/]\s*(\d{2,4}))?/);
+    if (!match) return null;
+    const start = Number(match[1]);
+    if (!start) return null;
+    let end = start;
+    if (match[2]) {
+      const endText = match[2];
+      end = Number(endText);
+      if (endText.length === 2) {
+        end = Math.floor(start / 100) * 100 + end;
+        if (end < start) end += 100;
+      }
+      if (end < start) return null;
+    }
+    return { start: start, end: end };
+  }
+
+  function decadesForRange(range) {
+    if (!range || range.end - range.start > 500) return [];
+    const first = Math.floor(range.start / 10) * 10;
+    const last = Math.floor(range.end / 10) * 10;
+    const decades = [];
+    for (let decade = first; decade <= last; decade += 10) decades.push(decade);
+    return decades;
+  }
+
+  function formatYearRange(range) {
+    return range.start === range.end ? String(range.start) : range.start + "–" + range.end;
+  }
+
+  function recordGender(record) {
+    const value = analysisText(record["(011) Geschlecht"]).toLocaleLowerCase("de");
+    if (["m", "männlich", "mann", "male"].indexOf(value) !== -1) return "male";
+    if (["w", "weiblich", "frau", "female"].indexOf(value) !== -1) return "female";
+    return "unknown";
+  }
+
+  function getArrayField(record, key) {
+    const value = record[key];
+    if (Array.isArray(value)) return value;
+    return value == null ? [] : [value];
+  }
+
+  function facultyEntryName(entry) {
+    if (typeof entry === "string") return entry.trim();
+    return entry && typeof entry === "object" ? analysisText(entry.Fakultät) : "";
+  }
+
+  function collectFacultyData() {
+    const assignments = [];
+    const faculties = new Map();
+    let undated = 0;
+    let duplicateCount = 0;
+    const assignmentKeys = new Set();
+    records.forEach(function (record, recordIndex) {
+      getArrayField(record, "(2+3) Fakultätszugehörigkeit").forEach(function (entry) {
+        const name = facultyEntryName(entry);
+        if (!name) return;
+        if (!faculties.has(name)) faculties.set(name, { name: name, members: new Set() });
+        faculties.get(name).members.add(recordIndex);
+        if (!entry || typeof entry !== "object") {
+          undated += 1;
+          return;
+        }
+        const start = exactYear(entry.Anfangsjahr);
+        const end = exactYear(entry.Endjahr);
+        if (!start) {
+          undated += 1;
+          return;
+        }
+        const range = { start: start, end: end && end >= start ? end : start };
+        decadesForRange(range).forEach(function (decade) {
+          const key = recordIndex + "\u0000" + name + "\u0000" + decade;
+          if (assignmentKeys.has(key)) {
+            duplicateCount += 1;
+            return;
+          }
+          assignmentKeys.add(key);
+          assignments.push({
+            recordIndex: recordIndex,
+            label: name,
+            decade: decade,
+            gender: recordGender(record)
+          });
+        });
+      });
+    });
+    return {
+      assignments: assignments,
+      faculties: Array.from(faculties.values()).sort(function (a, b) { return a.name.localeCompare(b.name, "de"); }),
+      undated: undated,
+      duplicateCount: duplicateCount
+    };
+  }
+
+  function collectPositionData() {
+    const assignments = [];
+    const labels = new Set();
+    const assignmentKeys = new Set();
+    let unclassified = 0;
+    let undated = 0;
+    let duplicateCount = 0;
+    records.forEach(function (record, recordIndex) {
+      getArrayField(record, "(12) Berufslaufbahn").forEach(function (entry) {
+        if (typeof entry !== "string" || !entry.trim()) return;
+        const matchedLabels = positionRules.filter(function (rule) {
+          return rule.pattern.test(entry);
+        }).map(function (rule) { return rule.label; });
+        if (!matchedLabels.length) {
+          unclassified += 1;
+          return;
+        }
+        const range = leadingYearRange(entry);
+        if (!range) {
+          undated += 1;
+          return;
+        }
+        const decades = decadesForRange(range);
+        if (!decades.length) {
+          undated += 1;
+          return;
+        }
+        matchedLabels.forEach(function (label) {
+          labels.add(label);
+          decades.forEach(function (decade) {
+            const key = recordIndex + "\u0000" + label + "\u0000" + decade;
+            if (assignmentKeys.has(key)) {
+              duplicateCount += 1;
+              return;
+            }
+            assignmentKeys.add(key);
+            assignments.push({
+              recordIndex: recordIndex,
+              label: label,
+              decade: decade,
+              gender: recordGender(record)
+            });
+          });
+        });
+      });
+    });
+    return {
+      assignments: assignments,
+      labels: Array.from(labels).sort(function (a, b) { return a.localeCompare(b, "de"); }),
+      unclassified: unclassified,
+      undated: undated,
+      duplicateCount: duplicateCount
+    };
+  }
+
+  function populateSelect(select, options, placeholder, selectedValue) {
+    select.replaceChildren();
+    if (!options.length) {
+      const empty = document.createElement("option");
+      empty.value = "";
+      empty.textContent = placeholder;
+      select.append(empty);
+      select.disabled = true;
+      return;
+    }
+    select.disabled = false;
+    options.forEach(function (optionData) {
+      const option = document.createElement("option");
+      option.value = optionData.value;
+      option.textContent = optionData.label;
+      select.append(option);
+    });
+    if (options.some(function (optionData) { return optionData.value === selectedValue; })) {
+      select.value = selectedValue;
+    }
+  }
+
+  function renderEmptyAnalytics(target, message) {
+    const empty = document.createElement("p");
+    empty.className = "analytics-empty";
+    empty.textContent = message;
+    target.replaceChildren(empty);
+  }
+
+  function renderBarChart(target, items, emptyMessage) {
+    target.replaceChildren();
+    if (!items.length) {
+      renderEmptyAnalytics(target, emptyMessage);
+      return;
+    }
+    const max = Math.max.apply(null, items.map(function (item) { return item.count; }));
+    items.forEach(function (item) {
+      const row = document.createElement("div");
+      row.className = "analytics-bar-row";
+      const label = document.createElement("span");
+      label.className = "analytics-bar-label";
+      label.textContent = item.label;
+      const track = document.createElement("span");
+      track.className = "analytics-bar-track";
+      track.setAttribute("aria-label", item.label + ": " + item.count);
+      const fill = document.createElement("span");
+      fill.className = "analytics-bar-fill";
+      fill.style.width = (item.count / max * 100) + "%";
+      track.append(fill);
+      const count = document.createElement("span");
+      count.className = "analytics-bar-value";
+      count.textContent = String(item.count);
+      row.append(label, track, count);
+      target.append(row);
+    });
+  }
+
+  function renderCompleteness() {
+    const fields = [
+      { label: "Geschlecht", get: function (record) { return record["(011) Geschlecht"]; } },
+      { label: "Geburtsjahr", get: function (record) { return record["(1) Name"] && record["(1) Name"].Geburtsjahr; } },
+      { label: "Sterbejahr", get: function (record) { return record["(1) Name"] && record["(1) Name"].Sterbejahr; } },
+      { label: "Geburtsort", get: function (record) { return record["(6+7) Lebensdaten"] && record["(6+7) Lebensdaten"].Geburtsort; } },
+      { label: "Sterbeort", get: function (record) { return record["(6+7) Lebensdaten"] && record["(6+7) Lebensdaten"].Sterbeort; } },
+      { label: "Fakultätszugehörigkeit", get: function (record) {
+        return getArrayField(record, "(2+3) Fakultätszugehörigkeit").map(facultyEntryName).filter(Boolean);
+      } },
+      { label: "Berufslaufbahn", get: function (record) { return record["(12) Berufslaufbahn"]; } },
+      { label: "Bildungsgang", get: function (record) { return record["(11) Bildungsgang"]; } },
+      { label: "Eltern, Ehepartner oder Kinder", get: function (record) { return [record["(8+9) Eltern"], record["(10) Ehepartner"], record["(10a) Kinder"]]; } },
+      { label: "Quellen oder Nachweise", get: function (record) { return [record["(17) Archivalische-Quellen"], record["(18) Literatur"], record["(18a) Online-Quellen"], record["(24) GND"]]; } }
+    ];
+    const table = document.createElement("table");
+    const head = document.createElement("thead");
+    const headerRow = document.createElement("tr");
+    ["Datenfeld", "Datensätze mit Angabe", "Anteil"].forEach(function (text) {
+      const cell = document.createElement("th");
+      cell.textContent = text;
+      headerRow.append(cell);
+    });
+    head.append(headerRow);
+    const body = document.createElement("tbody");
+    fields.forEach(function (field) {
+      const count = records.filter(function (record) { return hasAnalysisValue(field.get(record)); }).length;
+      const row = document.createElement("tr");
+      const label = document.createElement("td");
+      label.textContent = field.label;
+      const countCell = document.createElement("td");
+      countCell.textContent = count + " / " + records.length;
+      const percent = document.createElement("td");
+      percent.textContent = records.length ? Math.round(count / records.length * 100) + "%" : "0%";
+      row.append(label, countCell, percent);
+      body.append(row);
+    });
+    table.append(head, body);
+    completenessChart.replaceChildren(table);
+  }
+
+  function renderGenderChart(target, assignments, selectedLabel, emptyMessage, notes) {
+    const showCategories = selectedLabel === "__all__";
+    const filtered = showCategories
+      ? assignments
+      : assignments.filter(function (assignment) { return assignment.label === selectedLabel; });
+    const byDecade = new Map();
+    const seen = new Set();
+    filtered.forEach(function (assignment) {
+      const key = assignment.decade + (showCategories ? "\u0000" + assignment.label : "") + "\u0000" + assignment.recordIndex;
+      if (seen.has(key)) return;
+      seen.add(key);
+      const decadeKey = assignment.decade + (showCategories ? "\u0000" + assignment.label : "");
+      if (!byDecade.has(decadeKey)) byDecade.set(decadeKey, {
+        decade: assignment.decade,
+        label: showCategories ? assignment.label : "",
+        male: 0,
+        female: 0,
+        unknown: 0
+      });
+      byDecade.get(decadeKey)[assignment.gender] += 1;
+    });
+    target.replaceChildren();
+    if (!byDecade.size) {
+      renderEmptyAnalytics(target, emptyMessage);
+      if (notes) {
+        const note = document.createElement("p");
+        note.className = "analytics-explanation";
+        note.textContent = notes;
+        target.append(note);
+      }
+      return;
+    }
+    const legend = document.createElement("div");
+    legend.className = "analytics-legend";
+    [["male", "Männer"], ["female", "Frauen"]].forEach(function (item) {
+      const entry = document.createElement("span");
+      const swatch = document.createElement("i");
+      swatch.className = item[0];
+      entry.append(swatch, document.createTextNode(item[1]));
+      legend.append(entry);
+    });
+    target.append(legend);
+    Array.from(byDecade.values()).sort(function (a, b) {
+      return a.decade - b.decade || a.label.localeCompare(b.label, "de");
+    }).forEach(function (counts) {
+      const known = counts.male + counts.female;
+      const row = document.createElement("div");
+      row.className = "gender-chart-row";
+      const label = document.createElement("span");
+      label.className = "gender-chart-label";
+      label.textContent = counts.decade + "er" + (counts.label ? " · " + counts.label : "");
+      const track = document.createElement("span");
+      track.className = "gender-chart-track";
+      track.setAttribute("aria-label", label.textContent + ": " + counts.male + " Männer, " + counts.female + " Frauen, " + counts.unknown + " unbekannt");
+      const male = document.createElement("span");
+      male.className = "gender-chart-male";
+      male.style.width = known ? (counts.male / known * 100) + "%" : "0%";
+      const female = document.createElement("span");
+      female.className = "gender-chart-female";
+      female.style.width = known ? (counts.female / known * 100) + "%" : "0%";
+      track.append(male, female);
+      const detail = document.createElement("span");
+      detail.className = "gender-chart-counts";
+      detail.textContent = known
+        ? "Männer " + counts.male + " (" + Math.round(counts.male / known * 100) + "%) · Frauen " + counts.female + " (" + Math.round(counts.female / known * 100) + "%) · Unbekannt " + counts.unknown
+        : "Keine bekannte Geschlechtsangabe · Unbekannt " + counts.unknown;
+      row.append(label, track, detail);
+      target.append(row);
+    });
+    if (notes) {
+      const note = document.createElement("p");
+      note.className = "analytics-explanation";
+      note.textContent = notes;
+      target.append(note);
+    }
+  }
+
+  function renderPersonTimeline(recordIndex) {
+    const record = records[recordIndex];
+    personTimeline.replaceChildren();
+    timelineUndated.replaceChildren();
+    if (!record) {
+      renderEmptyAnalytics(personTimeline, "Keine Person ausgewählt.");
+      return;
+    }
+    const events = [];
+    const undated = [];
+    const name = record["(1) Name"] || {};
+    const birthYear = exactYear(name.Geburtsjahr);
+    const deathYear = exactYear(name.Sterbejahr);
+    if (birthYear) events.push({ year: birthYear, range: String(birthYear), label: "Geburt", text: "Geburtsjahr laut Namensfeld" });
+    if (deathYear) events.push({ year: deathYear, range: String(deathYear), label: "Tod", text: "Sterbejahr laut Namensfeld" });
+    [
+      { key: "(11) Bildungsgang", label: "Bildungsgang" },
+      { key: "(12) Berufslaufbahn", label: "Berufslaufbahn" },
+      { key: "(13) Akademische-Ämter", label: "Akademische Ämter" }
+    ].forEach(function (source) {
+      getArrayField(record, source.key).forEach(function (entry) {
+        if (typeof entry !== "string" || !entry.trim()) return;
+        const range = leadingYearRange(entry);
+        if (!range) {
+          undated.push({ label: source.label, text: entry });
+          return;
+        }
+        events.push({
+          year: range.start,
+          range: formatYearRange(range),
+          label: source.label,
+          text: entry
+        });
+      });
+    });
+    events.sort(function (a, b) { return a.year - b.year || a.label.localeCompare(b.label, "de"); });
+    if (!events.length) {
+      renderEmptyAnalytics(personTimeline, "Keine explizit datierten Angaben für den Zeitstrahl gefunden.");
+    } else {
+      const list = document.createElement("div");
+      list.className = "timeline-list";
+      events.forEach(function (item) {
+        const event = document.createElement("article");
+        event.className = "timeline-event";
+        const years = document.createElement("span");
+        years.className = "timeline-years";
+        years.textContent = item.range;
+        const label = document.createElement("span");
+        label.className = "timeline-source-label";
+        label.textContent = item.label;
+        const text = document.createElement("div");
+        text.className = "timeline-source";
+        text.textContent = item.text;
+        event.append(years, label, text);
+        list.append(event);
+      });
+      personTimeline.replaceChildren(list);
+    }
+    if (undated.length) {
+      const heading = document.createElement("strong");
+      heading.textContent = undated.length + " Angabe(n) ohne eindeutig auslesbare Jahreszahl:";
+      const list = document.createElement("ul");
+      undated.forEach(function (item) {
+        const entry = document.createElement("li");
+        entry.textContent = item.label + ": " + item.text;
+        list.append(entry);
+      });
+      timelineUndated.append(heading, list);
+    }
+  }
+
+  function renderFacultyNetwork(faculties, selectedName) {
+    facultyNetwork.replaceChildren();
+    const faculty = faculties.find(function (item) { return item.name === selectedName; });
+    if (!faculty) {
+      renderEmptyAnalytics(facultyNetwork, "Keine Fakultätszugehörigkeiten vorhanden.");
+      return;
+    }
+    const hub = document.createElement("div");
+    hub.className = "faculty-network-hub";
+    hub.textContent = faculty.name + " · " + faculty.members.size + (faculty.members.size === 1 ? " Person" : " Personen");
+    const members = document.createElement("div");
+    members.className = "faculty-network-members";
+    Array.from(faculty.members).sort(function (a, b) {
+      return fullName(records[a]).localeCompare(fullName(records[b]), "de");
+    }).forEach(function (recordIndex) {
+      const button = document.createElement("button");
+      button.type = "button";
+      button.className = "faculty-person-node";
+      button.textContent = familyCandidateLabel(recordIndex);
+      button.addEventListener("click", function () {
+        navigateToFamilyRecord(recordIndex);
+        analyticsDialog.close();
+      });
+      members.append(button);
+    });
+    facultyNetwork.append(hub, members);
+  }
+
+  function renderAnalytics() {
+    const total = records.length;
+    const genders = records.reduce(function (counts, record) {
+      counts[recordGender(record)] += 1;
+      return counts;
+    }, { male: 0, female: 0, unknown: 0 });
+    analyticsSummary.replaceChildren();
+    [
+      { label: "Geladene Datensätze", value: total },
+      { label: "Geschlecht männlich", value: genders.male },
+      { label: "Geschlecht weiblich", value: genders.female },
+      { label: "Geschlecht unbekannt/anders", value: genders.unknown }
+    ].forEach(function (item) {
+      const card = document.createElement("div");
+      card.className = "analytics-summary-card";
+      const label = document.createElement("span");
+      label.textContent = item.label;
+      const value = document.createElement("strong");
+      value.textContent = String(item.value);
+      card.append(label, value);
+      analyticsSummary.append(card);
+    });
+
+    renderCompleteness();
+    const births = new Map();
+    records.forEach(function (record) {
+      const year = exactYear(record["(1) Name"] && record["(1) Name"].Geburtsjahr);
+      if (year) {
+        const decade = Math.floor(year / 10) * 10;
+        births.set(decade, (births.get(decade) || 0) + 1);
+      }
+    });
+    renderBarChart(birthDecadeChart, Array.from(births.entries()).map(function (entry) {
+      return { label: entry[0] + "er", count: entry[1] };
+    }).sort(function (a, b) { return a.label.localeCompare(b.label, "de"); }), "Keine expliziten Geburtsjahre vorhanden.");
+
+    const positionData = collectPositionData();
+    const facultyData = collectFacultyData();
+    const facultyDistribution = facultyData.faculties.map(function (faculty) {
+      return { label: faculty.name, count: faculty.members.size };
+    }).sort(function (a, b) { return b.count - a.count || a.label.localeCompare(b.label, "de"); });
+    renderBarChart(facultyDistributionChart, facultyDistribution, "Keine Fakultätsnamen vorhanden.");
+
+    const recordOptions = records.map(function (record, index) {
+      return { value: String(index), label: familyCandidateLabel(index) };
+    });
+    const previousPerson = timelinePersonSelect.value;
+    populateSelect(timelinePersonSelect, recordOptions, "Keine Datensätze geladen", previousPerson || String(Math.max(0, selectedIndex)));
+    renderPersonTimeline(Number(timelinePersonSelect.value));
+
+    const previousPosition = genderPositionSelect.value;
+    populateSelect(genderPositionSelect, [{ value: "__all__", label: "Alle erkannten Positionen" }].concat(
+      positionData.labels.map(function (label) { return { value: label, label: label }; })
+    ), "Keine erkannten Positionen", previousPosition || "__all__");
+    renderGenderChart(
+      genderPositionChart,
+      positionData.assignments,
+      genderPositionSelect.value || "__all__",
+      "Keine eindeutig erkannten und datierten Positionen für diese Auswahl.",
+      "Nicht zugeordnete Berufslaufbahn-Einträge: " + positionData.unclassified +
+        " nicht sicher klassifizierbar, " + positionData.undated + " ohne lesbare Jahresangabe."
+    );
+
+    const facultyOptions = facultyData.faculties.map(function (faculty) {
+      return { value: faculty.name, label: faculty.name };
+    });
+    const previousFaculty = genderFacultySelect.value;
+    populateSelect(genderFacultySelect, [{ value: "__all__", label: "Alle Fakultäten" }].concat(facultyOptions),
+      "Keine Fakultäten vorhanden", previousFaculty || "__all__");
+    renderGenderChart(
+      genderFacultyChart,
+      facultyData.assignments,
+      genderFacultySelect.value || "__all__",
+      "Keine explizit datierten Fakultätszugehörigkeiten für diese Auswahl.",
+      "Fakultätsangaben ohne auswertbares Anfangsjahr: " + facultyData.undated + "."
+    );
+
+    const previousNetworkFaculty = facultyNetworkSelect.value;
+    populateSelect(facultyNetworkSelect, facultyOptions, "Keine Fakultäten vorhanden",
+      previousNetworkFaculty || (facultyOptions[0] && facultyOptions[0].value));
+    renderFacultyNetwork(facultyData.faculties, facultyNetworkSelect.value);
+  }
+
+  function openAnalytics() {
+    if (!records.length) return;
+    renderAnalytics();
+    analyticsDialog.showModal();
   }
 
   function warningCategory(message, hasLine) {
@@ -776,6 +1595,7 @@
     setText(visibleCount, visibleIndices.length + (visibleIndices.length === 1 ? " Eintrag" : " Einträge"));
     exportButton.disabled = visibleIndices.length === 0;
     createMapButton.disabled = visibleIndices.length === 0;
+    openAnalyticsButton.disabled = records.length === 0;
     const filterText = searchInput.value.trim() ? " passend zur Suche" : "";
     setRecordsNotice(records.length
       ? visibleIndices.length + " von " + records.length + " Einträgen werden angezeigt" + filterText + "."
@@ -1399,9 +2219,46 @@
     if (selectedIndex < 0 || !records[selectedIndex]) return;
     createPlacesMap([selectedIndex], "Orte von " + fullName(records[selectedIndex]));
   });
+  showFamilyGraphButton.addEventListener("click", openFamilyGraph);
+  openAnalyticsButton.addEventListener("click", openAnalytics);
   closeMapButton.addEventListener("click", closePlacesMap);
+  closeFamilyButton.addEventListener("click", function () { familyDialog.close(); });
+  closeAnalyticsButton.addEventListener("click", function () { analyticsDialog.close(); });
+  timelinePersonSelect.addEventListener("change", function () {
+    renderPersonTimeline(Number(timelinePersonSelect.value));
+  });
+  genderPositionSelect.addEventListener("change", function () {
+    const data = collectPositionData();
+    renderGenderChart(
+      genderPositionChart,
+      data.assignments,
+      genderPositionSelect.value || "__all__",
+      "Keine eindeutig erkannten und datierten Positionen für diese Auswahl.",
+      "Nicht zugeordnete Berufslaufbahn-Einträge: " + data.unclassified +
+        " nicht sicher klassifizierbar, " + data.undated + " ohne lesbare Jahresangabe."
+    );
+  });
+  genderFacultySelect.addEventListener("change", function () {
+    const data = collectFacultyData();
+    renderGenderChart(
+      genderFacultyChart,
+      data.assignments,
+      genderFacultySelect.value || "__all__",
+      "Keine explizit datierten Fakultätszugehörigkeiten für diese Auswahl.",
+      "Fakultätsangaben ohne auswertbares Anfangsjahr: " + data.undated + "."
+    );
+  });
+  facultyNetworkSelect.addEventListener("change", function () {
+    renderFacultyNetwork(collectFacultyData().faculties, facultyNetworkSelect.value);
+  });
   mapDialog.addEventListener("click", function (event) {
     if (event.target === mapDialog) closePlacesMap();
+  });
+  familyDialog.addEventListener("click", function (event) {
+    if (event.target === familyDialog) familyDialog.close();
+  });
+  analyticsDialog.addEventListener("click", function (event) {
+    if (event.target === analyticsDialog) analyticsDialog.close();
   });
   mapDialog.addEventListener("cancel", function () {
     mapGeneration += 1;
