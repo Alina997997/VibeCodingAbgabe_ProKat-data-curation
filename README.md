@@ -43,7 +43,15 @@ Die lokale WebApp liest TUSTEP-Textdateien ein und wandelt die erkannten Datens�
 3. Erzeuge die Vorschau. Sie enthält alle erkannten Datensätze und weist auf unbekannte oder nicht eindeutig lesbare Zeilen hin. Der Quelltext kann korrigiert und die Vorschau erneut erzeugt werden; auch das JSON selbst lässt sich vor dem Export bearbeiten.
 4. Lade das JSON herunter. Der Export ist nur möglich, solange das JSON syntaktisch gültig ist.
 
-Die Verarbeitung erfolgt vollständig im Browser. Es gibt keinen Upload und keine Verbindung zu externen Diensten; die Beispieldatei wird vom lokalen Webserver geladen.
+Import, Umwandlung und Verschlüsselung laufen im Browser. TUSTEP- und JSON-Daten werden nicht an einen Server übertragen. Die Beispieldatei wird vom lokalen Webserver geladen.
+
+### Lokales Backup für einen Rechnerwechsel
+
+1. Erzeuge eine gültige JSON-Vorschau und klicke auf **Backup herunterladen**. Die `.prokat-backup.json`-Datei enthält sowohl den TUSTEP-Quelltext als auch das aktuelle JSON.
+2. Übertrage die Datei bei Bedarf auf den anderen Rechner und wähle sie dort in der WebApp aus.
+3. Klicke auf **Backup laden**, um Quelltext und JSON wiederherzustellen.
+
+Das Backup ist **nicht verschlüsselt** und enthält personenbezogene Daten. Lege es nur auf einem geschützten Gerät ab und übertrage es ausschließlich über einen dafür zugelassenen, sicheren Weg. Nicht ins GitHub-Repository oder in einen nicht freigegebenen Cloudspeicher legen. `.prokat-backup.json`-Dateien werden von Git ignoriert. Die Übertragung ist manuell; eine automatische Synchronisierung gibt es nicht.
 
 ## Lokale Ausführung
 
@@ -66,8 +74,10 @@ Um den lokalen Webserver zu starten, navigieren Sie in das Verzeichnis, in dem s
 
 ```bash
 # Für Python 3.x
-python -m http.server 8000
+python -m http.server 8000 --bind 127.0.0.1
 ```
+
+Durch `--bind 127.0.0.1` ist der Webserver nur auf diesem Rechner erreichbar und nicht für andere Geräte im Netzwerk freigegeben.
 
 ### Schritt 3 - Zugriff auf die Webseite
 

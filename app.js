@@ -16,10 +16,16 @@
   const jsonStatus = document.getElementById("json-status");
   const downloadButton = document.getElementById("download-button");
   const copyButton = document.getElementById("copy-button");
+  const backupCreateButton = document.getElementById("backup-create-button");
+  const backupFileInput = document.getElementById("backup-file-input");
+  const backupFileName = document.getElementById("backup-file-name");
+  const backupRestoreButton = document.getElementById("backup-restore-button");
+  const backupStatus = document.getElementById("backup-status");
   const steps = Array.from(document.querySelectorAll(".step"));
   let sourceName = "tustep-export";
   let parsedRecords = 0;
   let isPreviewCurrent = false;
+  let pendingBackupFile = null;
 
   function updateSourceCount() {
     const count = sourceInput.value.length;
@@ -44,9 +50,11 @@
     previewContent.hidden = true;
     recordCount.textContent = "Vorschau veraltet";
     setStep(1);
+    updateBackupButtons();
   }
 
   function showFileError(message) {
+    isPreviewCurrent = false;
     previewEmpty.hidden = true;
     previewContent.hidden = false;
     validationMessage.className = "validation-message has-errors";
@@ -57,6 +65,35 @@
     downloadButton.disabled = true;
     copyButton.disabled = true;
     recordCount.textContent = "Datei nicht geladen";
+    updateBackupButtons();
+  }
+
+  function safeFileName(name, fallback) {
+    return String(name)
+      .replace(/[<>:"/\\|?*\u0000-\u001f]/g, "_")
+      .replace(/^\.+|\.+$/g, "")
+      .trim() || fallback;
+  }
+
+  function updateBackupButtons() {
+    backupCreateButton.disabled = !isPreviewCurrent || downloadButton.disabled;
+    backupRestoreButton.disabled = !pendingBackupFile;
+  }
+
+  function setBackupStatus(message, state) {
+    backupStatus.className = "backup-status" + (state ? " is-" + state : "");
+    backupStatus.textContent = message;
+  }
+
+  function downloadBlob(blob, filename) {
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = filename;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
   }
 
   async function loadFile(file) {
@@ -67,7 +104,7 @@
     }
     try {
       sourceInput.value = await file.text();
-      sourceName = file.name.replace(/\.txt$/i, "") || "tustep-export";
+      sourceName = safeFileName(file.name.replace(/\.txt$/i, ""), "tustep-export");
       updateSourceCount();
       resetPreview();
     } catch (error) {
@@ -110,6 +147,7 @@
       copyButton.disabled = true;
       recordCount.textContent = "0 Datensätze";
       setStep(1);
+      updateBackupButtons();
       return;
     }
 
@@ -128,6 +166,7 @@
     copyButton.disabled = false;
     setStep(2);
     validateJson(false);
+    updateBackupButtons();
   }
 
   function validateJson(announce) {
@@ -135,15 +174,20 @@
     try {
       const parsed = JSON.parse(jsonOutput.value);
       if (!Array.isArray(parsed)) throw new Error("Das JSON muss ein Array von Datensätzen sein.");
+      if (!parsed.every(function (record) { return record && typeof record === "object" && !Array.isArray(record); })) {
+        throw new Error("Jeder Eintrag im JSON muss ein Datensatz-Objekt sein.");
+      }
       jsonStatus.className = "json-status is-valid";
       jsonStatus.innerHTML = '<span class="status-dot"></span> Gültiges JSON · ' + parsed.length + (parsed.length === 1 ? ' Datensatz' : ' Datensätze');
       downloadButton.disabled = false;
       if (announce) setStep(3);
+      updateBackupButtons();
       return true;
     } catch (error) {
       jsonStatus.className = "json-status is-invalid";
       jsonStatus.innerHTML = '<span class="status-dot"></span> JSON-Fehler: ' + escapeHtml(error.message);
       downloadButton.disabled = true;
+      updateBackupButtons();
       return false;
     }
   }
@@ -176,18 +220,13 @@
     }
   });
   previewButton.addEventListener("click", generatePreview);
-  jsonOutput.addEventListener("input", function () { validateJson(false); });
+  jsonOutput.addEventListener("input", function () {
+    validateJson(false);
+    updateBackupButtons();
+  });
   downloadButton.addEventListener("click", function () {
     if (!validateJson(true)) return;
-    const blob = new Blob([jsonOutput.value], { type: "application/json;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = sourceName + ".json";
-    document.body.append(link);
-    link.click();
-    link.remove();
-    setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+    downloadBlob(new Blob([jsonOutput.value], { type: "application/json;charset=utf-8" }), sourceName + ".json");
   });
   copyButton.addEventListener("click", async function () {
     try {
@@ -197,6 +236,83 @@
     } catch (error) {
       jsonStatus.className = "json-status is-invalid";
       jsonStatus.innerHTML = '<span class="status-dot"></span> Kopieren nicht möglich: ' + escapeHtml(error.message);
+    }
+  });
+
+  backupFileInput.addEventListener("change", function () {
+    pendingBackupFile = backupFileInput.files[0] || null;
+    backupFileName.textContent = pendingBackupFile ? pendingBackupFile.name : "Keine Backup-Datei ausgewählt";
+    if (pendingBackupFile && !pendingBackupFile.name.toLowerCase().endsWith(".prokat-backup.json")) {
+      pendingBackupFile = null;
+      backupFileInput.value = "";
+      backupFileName.textContent = "Keine gültige Backup-Datei ausgewählt";
+      setBackupStatus("Bitte wähle eine .prokat-backup.json-Datei aus.", "error");
+    } else if (pendingBackupFile) {
+      setBackupStatus("Backup ausgewählt. Es enthält unverschlüsselte personenbezogene Daten.", "");
+    }
+    updateBackupButtons();
+  });
+  backupCreateButton.addEventListener("click", async function () {
+    if (!validateJson(false)) return;
+    backupCreateButton.disabled = true;
+    setBackupStatus("Backup wird erstellt …", "");
+    try {
+      const payload = {
+        format: "prokat-data-backup",
+        version: 1,
+        createdAt: new Date().toISOString(),
+        sourceName: sourceName,
+        sourceText: sourceInput.value,
+        records: JSON.parse(jsonOutput.value)
+      };
+      const blob = new Blob([JSON.stringify(payload, null, 2)], { type: "application/json;charset=utf-8" });
+      downloadBlob(blob, sourceName + ".prokat-backup.json");
+      setBackupStatus("Backup erstellt. Die Datei enthält unverschlüsselte personenbezogene Daten.", "success");
+    } catch (error) {
+      setBackupStatus("Backup konnte nicht erstellt werden: " + error.message, "error");
+    } finally {
+      updateBackupButtons();
+    }
+  });
+  backupRestoreButton.addEventListener("click", async function () {
+    if (!pendingBackupFile) return;
+    backupRestoreButton.disabled = true;
+    setBackupStatus("Backup wird geladen …", "");
+    try {
+      const payload = JSON.parse(await pendingBackupFile.text());
+      if (!payload || payload.format !== "prokat-data-backup" || payload.version !== 1 ||
+          typeof payload.sourceName !== "string" || typeof payload.sourceText !== "string" ||
+          !Array.isArray(payload.records) || !payload.records.every(function (record) {
+            return record && typeof record === "object" && !Array.isArray(record);
+          })) {
+        throw new Error("Die Backup-Datei hat ein unbekanntes oder ungültiges Format.");
+      }
+
+      const sourceResult = window.TustepConverter.parse(payload.sourceText);
+      sourceInput.value = payload.sourceText;
+      sourceName = safeFileName(payload.sourceName, "tustep-export");
+      updateSourceCount();
+      parsedRecords = payload.records.length;
+      previewEmpty.hidden = true;
+      previewContent.hidden = false;
+      jsonOutput.value = JSON.stringify(payload.records, null, 2);
+      jsonOutput.disabled = false;
+      validationMessage.className = "validation-message" + (sourceResult.warnings.length ? " has-errors" : "");
+      validationMessage.textContent = sourceResult.warnings.length
+        ? sourceResult.warnings.length + " Hinweis" + (sourceResult.warnings.length === 1 ? "" : "e") + " in den gespeicherten Quelldaten."
+        : "Backup geladen · " + parsedRecords + (parsedRecords === 1 ? " Datensatz" : " Datensätze") + ".";
+      renderWarnings(sourceResult.warnings);
+      recordCount.textContent = parsedRecords + (parsedRecords === 1 ? " Datensatz" : " Datensätze") +
+        (sourceResult.warnings.length ? " · " + sourceResult.warnings.length + (sourceResult.warnings.length === 1 ? " Hinweis" : " Hinweise") : "");
+      copyButton.disabled = false;
+      isPreviewCurrent = true;
+      setStep(2);
+      validateJson(false);
+      setBackupStatus("Backup geladen. Du kannst Quelltext und JSON weiterbearbeiten.", "success");
+    } catch (error) {
+      setBackupStatus("Backup konnte nicht geladen werden: " + error.message, "error");
+    } finally {
+      updateBackupButtons();
     }
   });
 
@@ -226,4 +342,5 @@
   });
 
   updateSourceCount();
+  updateBackupButtons();
 })();

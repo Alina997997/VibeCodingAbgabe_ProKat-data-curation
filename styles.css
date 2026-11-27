@@ -123,6 +123,16 @@ h2 { margin: 5px 0 0; font: 700 18px Manrope, sans-serif; letter-spacing: -.5px;
 .json-status.is-invalid { color: #a45243; }
 .json-status.is-invalid .status-dot { background: #d27466; }
 
+.backup-panel { min-height: 0; margin-top: 17px; }
+.backup-panel .panel-heading { margin-bottom: 8px; }
+.backup-copy { max-width: 760px; margin: 0 0 15px; color: #748078; font-size: 11px; line-height: 1.65; }
+.backup-actions { display: flex; align-items: center; flex-wrap: wrap; gap: 9px; margin-top: 14px; }
+.backup-file-button { cursor: pointer; }
+.backup-file-name { max-width: 230px; overflow: hidden; color: #89948c; font-size: 10px; text-overflow: ellipsis; white-space: nowrap; }
+.backup-status { margin: 13px 0 0; padding: 9px 11px; border-radius: 6px; color: #66746a; background: #f5f8f5; font-size: 10px; line-height: 1.55; }
+.backup-status.is-success { color: #376546; background: #edf6ef; }
+.backup-status.is-error { color: #965443; background: #fff3ef; }
+
 .guide { display: flex; align-items: center; gap: 12px; margin-top: 16px; padding: 13px 15px; border: 1px solid #e6eae4; border-radius: 8px; background: rgba(255,255,255,.63); }
 .guide-icon { display: grid; width: 20px; height: 20px; flex: 0 0 20px; place-items: center; border-radius: 50%; color: #49735a; background: #e9f2ec; font: 600 12px Georgia, serif; }
 .guide p { flex: 1; margin: 0; color: #758078; font-size: 10px; line-height: 1.6; }
@@ -161,6 +171,10 @@ h2 { margin: 5px 0 0; font: 700 18px Manrope, sans-serif; letter-spacing: -.5px;
   .text-button { margin-left: 36px; }
   .source-footer, .preview-footer { align-items: flex-start; flex-direction: column; }
   .source-footer .button, .preview-footer .button { align-self: stretch; }
+  .backup-actions { align-items: stretch; flex-direction: column; }
+  .backup-actions .button { width: 100%; }
+  .backup-file-button { width: 100%; }
+  .backup-file-name { max-width: 100%; }
   .guide { align-items: flex-start; flex-wrap: wrap; }
   .guide p { min-width: calc(100% - 34px); }
   .guide a { margin-left: 32px; }

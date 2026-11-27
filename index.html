@@ -99,6 +99,25 @@
       </div>
     </section>
 
+    <section class="panel backup-panel" aria-labelledby="backup-title">
+      <div class="panel-heading">
+        <div>
+          <div class="panel-kicker"><span class="panel-index">↔</span> DATEN ÜBERTRAGEN</div>
+          <h2 id="backup-title">Lokales Backup</h2>
+        </div>
+        <span class="count-badge">ohne Passwort</span>
+      </div>
+      <p class="backup-copy">Sichere Quelltext und JSON gemeinsam in einer Datei, die du auf diesem Gerät ablegen kannst. Diese Sicherung ist nicht verschlüsselt und enthält personenbezogene Daten.</p>
+      <div class="backup-actions">
+        <button id="backup-create-button" class="button button-primary" type="button" disabled>Backup herunterladen</button>
+        <label class="button button-secondary backup-file-button" for="backup-file-input">Backup-Datei auswählen</label>
+        <input id="backup-file-input" class="visually-hidden" type="file" accept=".prokat-backup.json,application/json">
+        <span id="backup-file-name" class="backup-file-name">Keine Backup-Datei ausgewählt</span>
+        <button id="backup-restore-button" class="button button-dark" type="button" disabled>Backup laden</button>
+      </div>
+      <p id="backup-status" class="backup-status" role="status" aria-live="polite">Nicht ins GitHub-Repository oder in einen nicht freigegebenen Cloudspeicher legen. Zum Übertragen nur einen dafür zugelassenen, geschützten Weg verwenden.</p>
+    </section>
+
     <aside class="guide">
       <span class="guide-icon" aria-hidden="true">i</span>
       <p><strong>Gut zu wissen</strong> · Die Vorschau zeigt alle gefundenen Datensätze. Unbekannte oder nicht eindeutig lesbare Zeilen werden als Hinweise markiert. Du kannst den Quelltext anpassen und die Vorschau erneut erzeugen – oder das JSON direkt bearbeiten.</p>

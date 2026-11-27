@@ -42,6 +42,8 @@ Im Folgenden wird das Datenformat beschrieben, in dem die ProfKatalog-Daten nach
 
 ### JSON-Datenformat
 
+Das folgende Beispiel beschreibt **einen einzelnen Datensatz**. Ein vollständiger Export mehrerer Personen wird als JSON-Array gespeichert, dessen Einträge jeweils diesem Objektformat entsprechen. Auch ein Export mit nur einem Datensatz ist ein Array mit einem Objekt.
+
 ```json
 {
   "(0) PK": "REK641 PK1 UAT55/131 jk2001+ JH19 LK19+ UAT51- OEW",
