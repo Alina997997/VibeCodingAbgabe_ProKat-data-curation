@@ -154,6 +154,32 @@ Das folgende Beispiel beschreibt **einen einzelnen Datensatz**. Ein vollständig
 }
 ```
 
+## Optionale digitale Ressourcen in der Eintragsübersicht
+
+Die Eintragsübersicht kann pro Person zusätzlich das optionale Array `"Digitale Ressourcen"` führen. Es stammt nicht aus einem TUSTEP-Feld und wird vom Konverter nicht automatisch erzeugt. Weblinks werden als `Typ: "Link"` mit Titel und HTTP(S)-Adresse gespeichert. Hochgeladene Dateien werden als `Typ: "Datei"` mit Dateiname, Medientyp, Dateigröße und Base64-kodiertem Dateiinhalt gespeichert. Dadurch bleiben sie in JSON-Exporten und Backups enthalten.
+
+```json
+{
+  "Digitale Ressourcen": [
+    {
+      "Typ": "Link",
+      "Titel": "Digitalisat",
+      "URL": "https://example.org/digitalisat"
+    },
+    {
+      "Typ": "Datei",
+      "Titel": "Notiz",
+      "Dateiname": "notiz.txt",
+      "Medientyp": "text/plain",
+      "GroesseBytes": 8,
+      "InhaltBase64": "YmVpc3BpZWw="
+    }
+  ]
+}
+```
+
+Die Base64-Kodierung vergrößert die JSON-Datei. Es gibt keine anwendungsseitige Dateigrößenbegrenzung; der verfügbare Arbeitsspeicher des Browsers setzt praktische Grenzen. Sensible Anhänge und Backups sind nicht verschlüsselt.
+
 ----
 
 # Konvertierungsanleitung

@@ -56,6 +56,13 @@
   const genderFacultyChart = document.getElementById("gender-faculty-chart");
   const facultyNetworkSelect = document.getElementById("faculty-network-select");
   const facultyNetwork = document.getElementById("faculty-network");
+  const digitalResourceList = document.getElementById("digital-resource-list");
+  const digitalLinkTitle = document.getElementById("digital-link-title");
+  const digitalLinkUrl = document.getElementById("digital-link-url");
+  const addDigitalLinkButton = document.getElementById("add-digital-link");
+  const chooseDigitalFilesButton = document.getElementById("choose-digital-files");
+  const digitalFileInput = document.getElementById("digital-file-input");
+  const digitalResourceStatus = document.getElementById("digital-resource-status");
   const stats = {
     total: document.getElementById("stat-total"),
     affected: document.getElementById("stat-affected"),
@@ -124,6 +131,8 @@
   const editableFieldPaths = new Set(editableFields.map(function (field) {
     return JSON.stringify(field.path);
   }));
+  const digitalResourceKey = "Digitale Ressourcen";
+  const appManagedFields = new Set([digitalResourceKey]);
   const emptyArrayItemTemplates = {
     "(1*) Namensvarianten": { PIT: "", Nachname: "", Vorname: "", Geburtsjahr: "", Sterbejahr: "" },
     "(2+3) Fakultätszugehörigkeit": { Anfangsjahr: "", Endjahr: "", Fakultät: "" },
@@ -1949,6 +1958,287 @@
     return renderPrimitiveEditor(container, label, value, path, record, problems, draftContext);
   }
 
+  function digitalResourceArray(record, createIfMissing) {
+    const value = record[digitalResourceKey];
+    if (value == null && createIfMissing) {
+      record[digitalResourceKey] = [];
+      return record[digitalResourceKey];
+    }
+    if (value == null) return [];
+    if (!Array.isArray(value)) throw new Error("Das Feld „" + digitalResourceKey + "“ muss ein Array sein. Prüfe den Datensatz im JSON-Editor.");
+    return value;
+  }
+
+  function safeWebUrl(value) {
+    try {
+      const parsed = new URL(String(value || "").trim());
+      return parsed.protocol === "https:" || parsed.protocol === "http:" ? parsed.href : "";
+    } catch (error) {
+      return "";
+    }
+  }
+
+  function setDigitalResourceStatus(message, isError) {
+    digitalResourceStatus.textContent = message;
+    digitalResourceStatus.classList.toggle("is-error", Boolean(isError));
+  }
+
+  function setDigitalResourceStatusForRecord(record, message, isError) {
+    if (records[selectedIndex] === record) setDigitalResourceStatus(message, isError);
+    else if (message) setRecordsNotice(fullName(record) + ": " + message);
+  }
+
+  function resourceAction(label, action, accessibleLabel) {
+    const button = document.createElement("button");
+    button.type = "button";
+    button.className = "button button-secondary array-action";
+    button.textContent = label;
+    if (accessibleLabel) button.setAttribute("aria-label", accessibleLabel);
+    button.addEventListener("click", action);
+    return button;
+  }
+
+  function formatDigitalFileSize(value) {
+    const size = Number(value);
+    if (!Number.isFinite(size) || size < 0) return "";
+    if (size < 1024) return size + " B";
+    const units = ["KB", "MB", "GB", "TB"];
+    let amount = size;
+    let unitIndex = -1;
+    do {
+      amount /= 1024;
+      unitIndex += 1;
+    } while (amount >= 1024 && unitIndex < units.length - 1);
+    return amount.toFixed(amount < 10 ? 1 : 0) + " " + units[unitIndex];
+  }
+
+  function removeDigitalResource(record, resourceIndex) {
+    let resources;
+    try {
+      resources = digitalResourceArray(record, false);
+    } catch (error) {
+      setDigitalResourceStatus(error.message, true);
+      return;
+    }
+    resources.splice(resourceIndex, 1);
+    commitDigitalResourceChange(record, "Digitale Ressource entfernt.");
+  }
+
+  function downloadDigitalResource(resource) {
+    try {
+      const base64 = resource && resource.InhaltBase64;
+      const emptyFile = resource && resource.GroesseBytes === 0 && base64 === "";
+      if (typeof base64 !== "string" || (!base64 && !emptyFile) || !/^[A-Za-z0-9+/]*={0,2}$/.test(base64)) {
+        throw new Error("Der eingebettete Dateiinhalt fehlt oder ist ungültig.");
+      }
+      const binary = window.atob(base64);
+      const bytes = new Uint8Array(binary.length);
+      for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+      const blob = new Blob([bytes], { type: "application/octet-stream" });
+      const downloadUrl = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = downloadUrl;
+      link.download = safeFileName(resource.Dateiname || resource.Titel || "digitale-ressource");
+      document.body.append(link);
+      link.click();
+      link.remove();
+      window.setTimeout(function () { URL.revokeObjectURL(downloadUrl); }, 1000);
+      setDigitalResourceStatus("Download für „" + (resource.Dateiname || resource.Titel || "Datei") + "“ gestartet.", false);
+    } catch (error) {
+      setDigitalResourceStatus("Datei konnte nicht heruntergeladen werden: " + error.message, true);
+    }
+  }
+
+  function renderDigitalResources(record) {
+    digitalResourceList.replaceChildren();
+    setDigitalResourceStatus("", false);
+    let resources;
+    try {
+      resources = digitalResourceArray(record, false);
+    } catch (error) {
+      const note = document.createElement("p");
+      note.className = "digital-resource-empty is-error";
+      note.textContent = error.message;
+      digitalResourceList.append(note);
+      setDigitalResourceStatus(error.message, true);
+      return;
+    }
+    if (!resources.length) {
+      const empty = document.createElement("p");
+      empty.className = "digital-resource-empty";
+      empty.textContent = "Noch keine digitalen Ressourcen verknüpft.";
+      digitalResourceList.append(empty);
+      return;
+    }
+    resources.forEach(function (resource, index) {
+      const card = document.createElement("article");
+      card.className = "digital-resource-item";
+      const details = document.createElement("div");
+      details.className = "digital-resource-details";
+      const title = document.createElement("strong");
+      title.className = "digital-resource-title";
+      const actions = document.createElement("div");
+      actions.className = "digital-resource-actions";
+      const removeButton = resourceAction("Entfernen", function () {
+        removeDigitalResource(record, index);
+      }, "Digitale Ressource " + (index + 1) + " entfernen");
+
+      if (!resource || typeof resource !== "object" || Array.isArray(resource)) {
+        title.textContent = "Ungültiger Ressourceneintrag";
+        const note = document.createElement("span");
+        note.className = "digital-resource-meta is-error";
+        note.textContent = "Bitte den Eintrag im JSON-Editor prüfen.";
+        details.append(title, note);
+      } else if (resource.Typ === "Link") {
+        const url = safeWebUrl(resource.URL);
+        title.textContent = analysisText(resource.Titel) || analysisText(resource.URL) || "Weblink";
+        if (url) {
+          const anchor = document.createElement("a");
+          anchor.className = "digital-resource-link";
+          anchor.href = url;
+          anchor.target = "_blank";
+          anchor.rel = "noopener noreferrer";
+          anchor.textContent = url;
+          details.append(title, anchor);
+        } else {
+          const note = document.createElement("span");
+          note.className = "digital-resource-meta is-error";
+          note.textContent = "Ungültige Adresse. Nur HTTP- und HTTPS-Links werden geöffnet.";
+          details.append(title, note);
+        }
+      } else if (resource.Typ === "Datei") {
+        const fileName = analysisText(resource.Dateiname) || analysisText(resource.Titel) || "Datei ohne Namen";
+        title.textContent = analysisText(resource.Titel) || fileName;
+        const meta = document.createElement("span");
+        meta.className = "digital-resource-meta";
+        meta.textContent = fileName + (formatDigitalFileSize(resource.GroesseBytes)
+          ? " · " + formatDigitalFileSize(resource.GroesseBytes)
+          : "");
+        details.append(title, meta);
+        actions.append(resourceAction("Herunterladen", function () {
+          downloadDigitalResource(resource);
+        }, "Anhang " + fileName + " herunterladen"));
+      } else {
+        title.textContent = analysisText(resource.Titel) || "Unbekannte Ressource";
+        const note = document.createElement("span");
+        note.className = "digital-resource-meta is-error";
+        note.textContent = "Unbekannter Ressourcentyp. Bitte den Eintrag im JSON-Editor prüfen.";
+        details.append(title, note);
+      }
+      actions.append(removeButton);
+      card.append(details, actions);
+      digitalResourceList.append(card);
+    });
+  }
+
+  function commitDigitalResourceChange(record, statusMessage) {
+    try {
+      refreshEditedRecord(record);
+    } catch (error) {
+      if (records[selectedIndex] === record) renderDigitalResources(record);
+      setDigitalResourceStatusForRecord(record, "Änderung konnte nicht übernommen werden: " + error.message, true);
+      return false;
+    }
+    if (records[selectedIndex] === record) renderDigitalResources(record);
+    setDigitalResourceStatusForRecord(record, statusMessage, false);
+    return true;
+  }
+
+  function addDigitalLink() {
+    const record = records[selectedIndex];
+    if (!record) return;
+    const url = safeWebUrl(digitalLinkUrl.value);
+    if (!url) {
+      setDigitalResourceStatus("Bitte eine gültige HTTP- oder HTTPS-Adresse eingeben.", true);
+      digitalLinkUrl.focus();
+      return;
+    }
+    let resources;
+    try {
+      resources = digitalResourceArray(record, true);
+    } catch (error) {
+      setDigitalResourceStatus(error.message, true);
+      return;
+    }
+    resources.push({
+      Typ: "Link",
+      Titel: digitalLinkTitle.value.trim() || url,
+      URL: url
+    });
+    digitalLinkTitle.value = "";
+    digitalLinkUrl.value = "";
+    commitDigitalResourceChange(record, "Weblink hinzugefügt.");
+  }
+
+  function readDigitalFile(file) {
+    return new Promise(function (resolve, reject) {
+      const reader = new FileReader();
+      reader.addEventListener("load", function () {
+        if (typeof reader.result !== "string") {
+          reject(new Error("Der Browser hat keinen Dateiinhalt zurückgegeben."));
+          return;
+        }
+        const separator = reader.result.indexOf(",");
+        if (separator < 0 || !reader.result.slice(0, separator).endsWith(";base64")) {
+          reject(new Error("Der Browser konnte die Datei nicht als Base64 kodieren."));
+          return;
+        }
+        resolve(reader.result.slice(separator + 1));
+      });
+      reader.addEventListener("error", function () {
+        reject(reader.error || new Error("Unbekannter Lesefehler."));
+      });
+      reader.addEventListener("abort", function () {
+        reject(new Error("Der Lesevorgang wurde abgebrochen."));
+      });
+      reader.readAsDataURL(file);
+    });
+  }
+
+  async function attachDigitalFiles(files) {
+    const record = records[selectedIndex];
+    if (!record || !files.length) return;
+    let resources;
+    try {
+      resources = digitalResourceArray(record, true);
+    } catch (error) {
+      setDigitalResourceStatus(error.message, true);
+      return;
+    }
+    const added = [];
+    const failures = [];
+    for (let index = 0; index < files.length; index += 1) {
+      const file = files[index];
+      if (records[selectedIndex] === record) {
+        setDigitalResourceStatus("Datei " + (index + 1) + " von " + files.length + " wird gelesen …", false);
+      }
+      try {
+        const content = await readDigitalFile(file);
+        added.push({
+          Typ: "Datei",
+          Titel: file.name,
+          Dateiname: file.name,
+          Medientyp: file.type || "application/octet-stream",
+          GroesseBytes: file.size,
+          InhaltBase64: content
+        });
+      } catch (error) {
+        failures.push(file.name + ": " + error.message);
+      }
+    }
+    if (added.length) {
+      resources.push.apply(resources, added);
+      const committed = commitDigitalResourceChange(record, added.length + (added.length === 1 ? " Datei eingebettet." : " Dateien eingebettet."));
+      if (!committed) return;
+    }
+    if (failures.length) {
+      const failedMessage = "Datei(en) konnten nicht eingebettet werden: " + failures.join(" · ");
+      setDigitalResourceStatusForRecord(record, added.length
+        ? digitalResourceStatus.textContent + " " + failedMessage
+        : failedMessage, true);
+    }
+  }
+
   function renderAdditional(record) {
     additionalSections.replaceChildren();
     const problems = problemCache[selectedIndex] || [];
@@ -1976,7 +2266,7 @@
     const otherFields = document.createElement("div");
     otherFields.className = "editable-section-fields";
     Object.keys(record).forEach(function (key) {
-      if (knownGroupKeys.has(key) || groupedKeys.has(key)) return;
+      if (knownGroupKeys.has(key) || groupedKeys.has(key) || appManagedFields.has(key)) return;
       renderEditableNode(otherFields, key, record[key], [key], record, problems);
     });
     if (otherFields.childElementCount) {
@@ -2041,6 +2331,7 @@
     renderIssues(problems);
     renderForm(record, problems);
     renderAdditional(record);
+    renderDigitalResources(record);
     jsonEditor.value = JSON.stringify(record, null, 2);
     setText(jsonStatus, "JSON nicht geändert");
     updateStatistics();
@@ -2082,12 +2373,16 @@
     if (!window.opener || !channel) return;
     if (notifyTimer) window.clearTimeout(notifyTimer);
     notifyTimer = window.setTimeout(function () {
-      window.opener.postMessage({
-        type: "prokat-records-updated",
-        channel: channel,
-        records: records,
-        warnings: sourceWarnings
-      }, messageTargetOrigin());
+      try {
+        window.opener.postMessage({
+          type: "prokat-records-updated",
+          channel: channel,
+          records: records,
+          warnings: sourceWarnings
+        }, messageTargetOrigin());
+      } catch (error) {
+        setRecordsNotice("Aktualisierung der Konverter-Ansicht fehlgeschlagen: " + error.message + " Die Daten bleiben in der Übersicht bearbeitbar; exportiere sie hier als JSON.");
+      }
     }, 120);
   }
 
@@ -2122,17 +2417,21 @@
   function exportVisibleRecords() {
     const visibleRecords = visibleIndices.map(function (index) { return records[index]; });
     if (!visibleRecords.length) return;
-    const payload = JSON.stringify(visibleRecords, null, 2);
-    const blob = new Blob([payload], { type: "application/json;charset=utf-8" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = safeFileName(sourceName) + "-gefiltert.json";
-    document.body.append(link);
-    link.click();
-    link.remove();
-    window.setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
-    setRecordsNotice(visibleRecords.length + (visibleRecords.length === 1 ? " gefilterter Eintrag wurde" : " gefilterte Einträge wurden") + " als JSON exportiert.");
+    try {
+      const payload = JSON.stringify(visibleRecords, null, 2);
+      const blob = new Blob([payload], { type: "application/json;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = safeFileName(sourceName) + "-gefiltert.json";
+      document.body.append(link);
+      link.click();
+      link.remove();
+      window.setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
+      setRecordsNotice(visibleRecords.length + (visibleRecords.length === 1 ? " gefilterter Eintrag wurde" : " gefilterte Einträge wurden") + " als JSON exportiert.");
+    } catch (error) {
+      setRecordsNotice("JSON-Export fehlgeschlagen: " + error.message);
+    }
   }
 
   function applyRecordJson() {
@@ -2224,6 +2523,13 @@
   closeMapButton.addEventListener("click", closePlacesMap);
   closeFamilyButton.addEventListener("click", function () { familyDialog.close(); });
   closeAnalyticsButton.addEventListener("click", function () { analyticsDialog.close(); });
+  addDigitalLinkButton.addEventListener("click", addDigitalLink);
+  chooseDigitalFilesButton.addEventListener("click", function () { digitalFileInput.click(); });
+  digitalFileInput.addEventListener("change", function () {
+    const files = Array.from(digitalFileInput.files || []);
+    digitalFileInput.value = "";
+    attachDigitalFiles(files);
+  });
   timelinePersonSelect.addEventListener("change", function () {
     renderPersonTimeline(Number(timelinePersonSelect.value));
   });

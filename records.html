@@ -150,6 +150,26 @@
 
           <div id="additional-sections" class="additional-sections" aria-label="Weitere bearbeitbare Angaben"></div>
 
+          <section class="detail-block digital-resource-panel" aria-labelledby="digital-resources-title">
+            <h3 id="digital-resources-title">Digitale Ressourcen</h3>
+            <p class="digital-resource-help">Weblinks und Dateien werden diesem Personendatensatz zugeordnet. Dateien werden in der JSON-Datei eingebettet; große Dateien können den Browser verlangsamen und Exporte sowie Backups deutlich vergrößern.</p>
+            <div id="digital-resource-list" class="digital-resource-list" aria-live="polite"></div>
+            <div class="digital-resource-add">
+              <label class="form-field">
+                <span class="field-label">Titel des Links</span>
+                <input id="digital-link-title" type="text" maxlength="300" placeholder="z. B. Digitalisat im Universitätsarchiv">
+              </label>
+              <label class="form-field">
+                <span class="field-label">Webadresse (HTTP oder HTTPS)</span>
+                <input id="digital-link-url" type="url" inputmode="url" placeholder="https://…" autocomplete="url">
+              </label>
+              <button id="add-digital-link" class="button button-secondary" type="button">Link hinzufügen</button>
+              <button id="choose-digital-files" class="button button-secondary" type="button">Dateien anhängen</button>
+              <input id="digital-file-input" class="visually-hidden" type="file" multiple aria-label="Digitale Dateien auswählen">
+            </div>
+            <p id="digital-resource-status" class="digital-resource-status" role="status" aria-live="polite"></p>
+          </section>
+
           <details class="json-details">
             <summary>JSON dieses Eintrags anzeigen / bearbeiten</summary>
             <p class="json-help">Bearbeite bei Bedarf den vollständigen Datensatz. Änderungen werden erst mit „JSON-Änderungen übernehmen“ gespeichert.</p>

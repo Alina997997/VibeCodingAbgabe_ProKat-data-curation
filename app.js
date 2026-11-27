@@ -263,11 +263,23 @@
       return;
     }
 
+    let updatedJson;
+    let updatedSnapshot;
+    try {
+      updatedJson = JSON.stringify(message.records, null, 2);
+      updatedSnapshot = JSON.stringify(message.records);
+      jsonOutput.value = updatedJson;
+    } catch (error) {
+      validationMessage.className = "validation-message has-errors";
+      validationMessage.textContent = "Änderungen aus der Eintragsübersicht konnten nicht übernommen werden: " +
+        error.message + " Exportiere die Datensätze direkt aus der Übersicht als JSON.";
+      return;
+    }
+
     currentRecords = message.records;
     currentWarnings = message.warnings;
-    overviewRecordsSnapshot = JSON.stringify(currentRecords);
+    overviewRecordsSnapshot = updatedSnapshot;
     parsedRecords = currentRecords.length;
-    jsonOutput.value = JSON.stringify(currentRecords, null, 2);
     isPreviewCurrent = true;
     copyButton.disabled = false;
     validationMessage.className = "validation-message";

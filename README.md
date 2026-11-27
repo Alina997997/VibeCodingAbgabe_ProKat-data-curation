@@ -4,7 +4,7 @@
 Um den ProKat Datensatz für die weitere Analyse vorzubereiten, wird in diesem Repository eine grafische Benutzeroberfläche bereitgestellt. 
 Diese dienen der Überprüfung, Bereinigung, und Transformation der Daten und zu ihrem Export im anvisierten Datenformat.
 
-Da es sich bei diesem Datensatz um einen **personenbezogenen** Datensatz handelt, werden Import, Umwandlung, Bearbeitung und Export lokal im Browser durchgeführt. Der **Datensatz selbst ist nicht in diesem Repository** enthalten und wird nicht als Ganzes an externe Dienste übertragen.
+Da es sich bei diesem Datensatz um einen **personenbezogenen** Datensatz handelt, werden Import, Umwandlung, Bearbeitung und Export lokal im Browser durchgeführt. Der **Datensatz selbst ist nicht in diesem Repository** enthalten und wird nicht als Ganzes an externe Dienste übertragen. An eine Person angehängte Dateien werden in der lokalen JSON-Datei eingebettet und nicht an einen Server übertragen.
 Die optionale Kartenfunktion ist eine begrenzte Ausnahme: Für die Ortsverortung werden einzelne Ortsnamen an einen externen Geocodierungsdienst gesendet; Personen- und Biografiedaten werden dabei nicht übertragen. Weitere Hinweise dazu stehen im Abschnitt „Orte kartografisch darstellen“.
 Der Datensatz darf nicht durch Anwendungen von Drittanbietern, insbesondere durch KI-gestützte Tools, verarbeitet werden, da dies ein Risiko für die Privatsphäre der betroffenen Personen darstellen könnte.
 
@@ -64,9 +64,15 @@ Die Geschlechterverteilungen für Arbeitspositionen und Fakultäten werden getre
 
 Alle Visualisierungen sind lesende Auswertungen: Sie ändern weder die Quelldatensätze noch ergänzen sie fehlende Angaben. Nicht auswertbare Jahreszahlen und Zuordnungen werden nicht geschätzt.
 
+### Digitale Ressourcen pro Person
+
+Im Detailbereich eines Datensatzes lassen sich Weblinks und lokale Dateien mit der ausgewählten Person verknüpfen. Links müssen mit HTTP oder HTTPS beginnen. Anhänge werden in den Datensatz eingebettet und beim JSON-Export sowie im Backup mitgespeichert; sie werden nicht an einen Server übertragen. Die Dateien werden Base64-kodiert und vergrößern dadurch JSON-Exporte und Backups. Eine anwendungsseitige Dateigrößenbegrenzung gibt es nicht, aber sehr große Dateien können den Browser verlangsamen oder dessen Speichergrenzen erreichen. Behandle Anhänge und Backups als personenbezogene, nicht verschlüsselte Daten.
+
+Die optionalen Einträge stehen im Datensatz unter `Digitale Ressourcen`. Das Format ist im Abschnitt „Optionale digitale Ressourcen in der Eintragsübersicht“ in `export-data-format.md` beschrieben.
+
 ### Lokales Backup für einen Rechnerwechsel
 
-1. Erzeuge eine gültige JSON-Vorschau und klicke auf **Backup herunterladen**. Die `.prokat-backup.json`-Datei enthält sowohl den TUSTEP-Quelltext als auch das aktuelle JSON.
+1. Erzeuge eine gültige JSON-Vorschau und klicke auf **Backup herunterladen**. Die `.prokat-backup.json`-Datei enthält sowohl den TUSTEP-Quelltext als auch das aktuelle JSON einschließlich eingebetteter Dateien.
 2. Übertrage die Datei bei Bedarf auf den anderen Rechner und wähle sie dort in der WebApp aus.
 3. Klicke auf **Backup laden**, um Quelltext und JSON wiederherzustellen.
 

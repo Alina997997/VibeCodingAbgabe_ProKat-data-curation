@@ -151,6 +151,20 @@ tbody tr.row-has-issue td:first-child { box-shadow: inset 3px 0 #d29368; }
 .additional-sections { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 10px; margin-top: 16px; }
 .detail-block { min-width: 0; padding: 11px; border: 1px solid #edf0ec; border-radius: 6px; background: #fcfdfc; }
 .detail-block h3 { margin-bottom: 9px; }
+.digital-resource-panel { margin-top: 12px; }
+.digital-resource-help { margin: -2px 0 10px; color: #849087; font-size: 9px; line-height: 1.55; }
+.digital-resource-list { display: grid; gap: 7px; margin-bottom: 10px; }
+.digital-resource-empty { margin: 0; color: #9aa39c; font-size: 9px; font-style: italic; }
+.digital-resource-item { min-width: 0; display: flex; align-items: center; justify-content: space-between; gap: 12px; padding: 9px; border: 1px solid #e8ece7; border-radius: 5px; background: #fff; }
+.digital-resource-details { min-width: 0; display: grid; gap: 4px; }
+.digital-resource-title { color: #405248; font-size: 9px; overflow-wrap: anywhere; }
+.digital-resource-link, .digital-resource-meta { color: #758078; font-size: 8px; line-height: 1.45; overflow-wrap: anywhere; }
+.digital-resource-link { color: #3e7350; text-decoration: underline; text-underline-offset: 2px; }
+.digital-resource-meta.is-error, .digital-resource-status.is-error, .digital-resource-empty.is-error { color: #a45243; }
+.digital-resource-actions { display: flex; flex: 0 0 auto; flex-wrap: wrap; justify-content: flex-end; gap: 5px; }
+.digital-resource-add { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.5fr) auto auto; align-items: end; gap: 8px; }
+.digital-resource-add .form-field input { min-height: 34px; }
+.digital-resource-status { min-height: 14px; margin: 8px 0 0; color: #627168; font-size: 8px; line-height: 1.5; }
 .editable-section-fields, .editable-object-fields { display: grid; gap: 8px; }
 .editable-object { grid-column: 1 / -1; display: grid; gap: 8px; padding: 9px; border: 1px solid #e8ece7; border-radius: 5px; background: #fff; }
 .editable-collection { display: grid; gap: 7px; }
@@ -310,6 +324,9 @@ tbody tr.row-has-issue td:first-child { box-shadow: inset 3px 0 #d29368; }
   table { min-width: 625px; }
   .detail-panel { padding: 13px; }
   .form-fields, .additional-sections, .editable-object-fields { grid-template-columns: 1fr; }
+  .digital-resource-add { grid-template-columns: 1fr; }
+  .digital-resource-item { align-items: flex-start; flex-direction: column; }
+  .digital-resource-actions { justify-content: flex-start; }
   .form-field.is-wide { grid-column: auto; }
   .records-footer { flex-direction: column; gap: 5px; }
   .map-dialog { width: calc(100vw - 14px); max-height: calc(100vh - 14px); border-radius: 8px; }
