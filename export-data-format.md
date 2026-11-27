@@ -64,6 +64,7 @@ Im Folgenden wird das Datenformat beschrieben, in dem die ProfKatalog-Daten nach
   "(1a) Kurzcharakterisierung": "Ev. Theologe, Prof. an der Philosophischen Fakultät",
   "(1b) Studium-in-Tübingen": "1768 imm., Bacc. art., 1770 Mag. art., 1770-1772 stud. theol.",
   "(1c) Biogramme": "1790 o. Prof. für Logik und Metaphysik, Beredsamkeit und Dichtkunst, 1798-1811 o. Prof. für Prakt. Philosophie und Dichtkunst, 1801/02 und 1808/09 Rektor der Universität. 1811 Prälat und Generalsuperintendent ((oÖhringen)) und Leiter des Seminars ((oSchöntal)). 1823 Generalsuperintendent ((oUrach)) und ((oReutlingen))",
+  "(1d) Würdigung": "",
   "(2+3) Fakultätszugehörigkeit": [{
     "Anfangsjahr": "1790",
     "Endjahr": "1811",
@@ -157,7 +158,7 @@ Diese folgende Anleitung beschreibt die strukturierte Transformation eines Rohda
 
 ---
 
-## 1. Metadaten und Kennungen (`#0`, `#011`, `#012`)
+## 1. Metadaten und Kennungen (`#0`, `#0a`, `#011`, `#012`)
 
 * **Original:**
 ```txt
@@ -169,7 +170,7 @@ Diese folgende Anleitung beschreibt die strukturierte Transformation eines Rohda
 * **JSON-Konvertierung:**
   * **`"(0) PK"`:** Die vollständige Parameter- und Kennungskette wird nach Bereinigung von Trennzeichen (z. B. abschließenden Punkten) als einzelner String übernommen.
   * **`"(011) Geschlecht"`:** Der Wert hinter `#011` (z. B. `"männlich"`) wird direkt zugewiesen.
-  * **`"(012) Uni-Angehörigkeit"`:** Mehrfach vorkommende `#012 UNIANG:`-Einträge werden extrahiert und als Array von Strings abgebildet (z. B. `["Student", "Lehrkörper (o. Prof)"]`).
+  * **`"(012) Uni-Angehörigkeit"`:** Mehrfach vorkommende `#012 UNIANG:`-Einträge (sowie gegebenenfalls `#0a`) werden extrahiert und als Array von Strings abgebildet (z. B. `["Student", "Lehrkörper (o. Prof)"]`).
 
 
 
@@ -196,13 +197,14 @@ Diese folgende Anleitung beschreibt die strukturierte Transformation eines Rohda
 
 ---
 
-## 3. Biografische Kurztexte und Studiennotizen (`#1a`, `#1b`, `#1c`)
+## 3. Biografische Kurztexte und Studiennotizen (`#1a`, `#1b`, `#1c`, `#1d`)
 
 * **Original:** Textzeilen, die oft mit Status-Tags wie `{Bio5}` oder `{BIB+}` beginnen.
 * **JSON-Konvertierung:** Die Status-Tags werden für das reine Textfeld bereinigt. Der verbleibende Beschreibungstext wird als String zugewiesen:
   * `"(1a) Kurzcharakterisierung"`
   * `"(1b) Studium-in-Tübingen"`
   * `"(1c) Biogramme"`
+  * `"(1d) Würdigung"` (falls im Quelldatensatz vorhanden)
 
 
 

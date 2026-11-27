@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="de">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#f5f7f3">
+  <title>ProKat · TUSTEP-Konverter</title>
+  <link rel="stylesheet" href="styles.css">
+  <script src="converter.js" defer></script>
+  <script src="app.js" defer></script>
+</head>
+<body>
+  <header class="topbar">
+    <a class="brand" href="./" aria-label="ProKat Startseite">
+      <span class="brand-mark" aria-hidden="true"><span></span><span></span><span></span><span></span></span>
+      <span>prokat<span class="brand-divider">/</span><span class="brand-section">Datenwerkstatt</span></span>
+    </a>
+    <span class="local-badge"><span class="status-dot"></span> Lokal auf diesem Gerät</span>
+  </header>
+
+  <main class="page-shell">
+    <section class="intro">
+      <div class="eyebrow"><span class="eyebrow-line"></span> DATENAUFBEREITUNG · IMPORT</div>
+      <h1>TUSTEP zu <span>JSON.</span></h1>
+      <p class="intro-copy">Personendaten einlesen, die Umwandlung kontrollieren und erst dann als JSON speichern. Deine Daten bleiben dabei in deinem Browser.</p>
+    </section>
+
+    <nav class="steps" aria-label="Arbeitsschritte">
+      <div class="step is-active" data-step="1"><span class="step-number">01</span><span>Datei einlesen</span></div>
+      <span class="step-connector" aria-hidden="true"></span>
+      <div class="step" data-step="2"><span class="step-number">02</span><span>Vorschau prüfen</span></div>
+      <span class="step-connector" aria-hidden="true"></span>
+      <div class="step" data-step="3"><span class="step-number">03</span><span>JSON exportieren</span></div>
+    </nav>
+
+    <section class="workspace" aria-label="TUSTEP-Konverter">
+      <div class="panel source-panel">
+        <div class="panel-heading">
+          <div>
+            <div class="panel-kicker"><span class="panel-index">01</span> QUELLE</div>
+            <h2>TUSTEP-Datei</h2>
+          </div>
+          <label class="button button-secondary upload-button" for="file-input">
+            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 13V3m0 0L6.5 6.5M10 3l3.5 3.5M4 12.5v3A1.5 1.5 0 0 0 5.5 17h9a1.5 1.5 0 0 0 1.5-1.5v-3"/></svg>
+            Datei auswählen
+          </label>
+          <input id="file-input" class="visually-hidden" type="file" accept=".txt,text/plain">
+        </div>
+        <div id="drop-zone" class="drop-zone">
+          <svg class="upload-icon" viewBox="0 0 32 32" aria-hidden="true"><path d="M16 21V5m0 0-5.5 5.5M16 5l5.5 5.5M6 20v5a2 2 0 0 0 2 2h16a2 2 0 0 0 2-2v-5"/></svg>
+          <div class="drop-copy"><strong>Datei hier ablegen</strong><span>oder .txt-Datei auswählen</span></div>
+          <button id="sample-button" class="text-button" type="button">Beispieldaten laden <span aria-hidden="true">↗</span></button>
+        </div>
+        <div class="editor-heading">
+          <label for="source-input">Quelldaten <span class="subtle-label">· bearbeitbar</span></label>
+          <span id="source-count" class="character-count">Noch keine Datei geladen</span>
+        </div>
+        <textarea id="source-input" class="code-editor source-editor" spellcheck="false" aria-label="TUSTEP-Quelldaten" placeholder="Lade eine TUSTEP-TXT-Datei hoch oder füge den Code hier ein …"></textarea>
+        <div class="source-footer">
+          <span class="privacy-note"><svg viewBox="0 0 16 16" aria-hidden="true"><rect x="3" y="7" width="10" height="7" rx="1.5"/><path d="M5.5 7V5a2.5 2.5 0 0 1 5 0v2"/></svg> Keine Übertragung an einen Server</span>
+          <button id="preview-button" class="button button-primary" type="button" disabled>
+            Vorschau erzeugen
+            <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M4 10h12m-5-5 5 5-5 5"/></svg>
+          </button>
+        </div>
+      </div>
+
+      <div class="panel preview-panel">
+        <div class="panel-heading preview-heading">
+          <div>
+            <div class="panel-kicker"><span class="panel-index">02</span> KONTROLLE</div>
+            <h2>JSON-Vorschau</h2>
+          </div>
+          <span id="record-count" class="count-badge">Wartet auf Daten</span>
+        </div>
+        <div id="preview-empty" class="preview-empty">
+          <div class="empty-art" aria-hidden="true"><span>{</span><i></i><span>}</span></div>
+          <strong>Deine Vorschau erscheint hier</strong>
+          <p>Erzeuge die Vorschau, um die erkannten Datensätze und mögliche Importhinweise zu prüfen.</p>
+        </div>
+        <div id="preview-content" class="preview-content" hidden>
+          <div id="validation-message" class="validation-message" role="status" aria-live="polite"></div>
+          <div id="issues" class="issues" aria-live="polite"></div>
+          <div class="editor-heading json-editor-heading">
+            <label for="json-output">Erzeugtes JSON <span class="subtle-label">· vor dem Export bearbeitbar</span></label>
+            <button id="copy-button" class="icon-button" type="button" title="JSON in die Zwischenablage kopieren" aria-label="JSON in die Zwischenablage kopieren" disabled>
+              <svg viewBox="0 0 20 20" aria-hidden="true"><rect x="7" y="7" width="9" height="10" rx="1.5"/><path d="M12.5 7V4.5A1.5 1.5 0 0 0 11 3H5.5A1.5 1.5 0 0 0 4 4.5V12a1.5 1.5 0 0 0 1.5 1.5H7"/></svg>
+            </button>
+          </div>
+          <textarea id="json-output" class="code-editor json-editor" spellcheck="false" aria-label="JSON-Vorschau" placeholder="Die Vorschau wird nach dem Einlesen hier angezeigt …" disabled></textarea>
+          <div class="preview-footer">
+            <span id="json-status" class="json-status"><span class="status-dot"></span> Noch nicht geprüft</span>
+            <button id="download-button" class="button button-dark" type="button" disabled>
+              JSON herunterladen
+              <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3v10m0 0 3.5-3.5M10 13 6.5 9.5M4 14v2.5A.5.5 0 0 0 4.5 17h11a.5.5 0 0 0 .5-.5V14"/></svg>
+            </button>
+          </div>
+        </div>
+      </div>
+    </section>
+
+    <aside class="guide">
+      <span class="guide-icon" aria-hidden="true">i</span>
+      <p><strong>Gut zu wissen</strong> · Die Vorschau zeigt alle gefundenen Datensätze. Unbekannte oder nicht eindeutig lesbare Zeilen werden als Hinweise markiert. Du kannst den Quelltext anpassen und die Vorschau erneut erzeugen – oder das JSON direkt bearbeiten.</p>
+      <a href="import-data-format.md" target="_blank" rel="noreferrer">Formatleitfaden <span aria-hidden="true">↗</span></a>
+    </aside>
+    <footer class="page-footer"><span>ProKat Datenaufarbeitung</span><span>Alle Verarbeitung findet lokal im Browser statt.</span></footer>
+  </main>
+</body>
+</html>

@@ -1,0 +1,3 @@
+Prompts
+
+Erstelle mir eine WebApp/ein Tool in das ich einen TUSTEP-Code (Beispiel siehe import-data-example.txt) uploaden kann. Dieser TUSTEP-Code soll dann in einen schön aufgeräumten, ordentlichen, übersichtlichen und funktionierenden json Code umgewandelt werden. Verwende dafür die angehängte .md Datei als Leitfaden und Erklärung für die in der TUSTEP-Version verwendeten Abkürzungen. Wichtig ist zudem, dass eine Vorschau von dem erstellten json Code gezeigt wird, damit etwaige Fehler korrigiert werden können, bevor der komplette Code in json übersetzt wird

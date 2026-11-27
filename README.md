@@ -34,6 +34,17 @@ Die Anforderungen für die Umsetzung der Datenaufarbeitung sind in der Datei `ta
 - Ein Beispieldatensatz ist in der Datei `import-data-example.txt` enthalten.
 - Das anvisierte Zieldateiformat ist in der Datei `export-data-format.md` beschrieben.
 
+## TUSTEP-Dateien in JSON umwandeln
+
+Die lokale WebApp liest TUSTEP-Textdateien ein und wandelt die erkannten Datensätze in das in `export-data-format.md` beschriebene JSON-Format um:
+
+1. Starte den lokalen Webserver wie unten beschrieben und öffne `http://localhost:8000`.
+2. Lade eine `.txt`-Datei hoch, ziehe sie in das Dateifeld oder füge TUSTEP-Code direkt in das Quelltextfeld ein. Mit **Beispieldaten laden** kannst du den mitgelieferten Beispieldatensatz öffnen.
+3. Erzeuge die Vorschau. Sie enthält alle erkannten Datensätze und weist auf unbekannte oder nicht eindeutig lesbare Zeilen hin. Der Quelltext kann korrigiert und die Vorschau erneut erzeugt werden; auch das JSON selbst lässt sich vor dem Export bearbeiten.
+4. Lade das JSON herunter. Der Export ist nur möglich, solange das JSON syntaktisch gültig ist.
+
+Die Verarbeitung erfolgt vollständig im Browser. Es gibt keinen Upload und keine Verbindung zu externen Diensten; die Beispieldatei wird vom lokalen Webserver geladen.
+
 ## Lokale Ausführung
 
 Da ein Webseiten-basiertes Interface zu erstellen ist, muss der Inhalt (die Webseite) des Repositorys lokal auf dem Rechner ausgeführt werden.
