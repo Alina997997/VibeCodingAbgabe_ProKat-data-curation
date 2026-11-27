@@ -39,6 +39,7 @@
     { label: "PIT", path: ["(1) Name", "PIT"] },
     { label: "Nachname", path: ["(1) Name", "Nachname"] },
     { label: "Vorname", path: ["(1) Name", "Vorname"] },
+    { label: "Unaufgeteilter Name", path: ["(1) Name", "Unaufgeteilter Name"] },
     { label: "Geburtsjahr", path: ["(1) Name", "Geburtsjahr"] },
     { label: "Sterbejahr", path: ["(1) Name", "Sterbejahr"] },
     { label: "Kurzcharakterisierung", path: ["(1a) Kurzcharakterisierung"], multiline: true, wide: true },
@@ -78,9 +79,24 @@
     element.textContent = value == null ? "" : String(value);
   }
 
+  function setRecordsNotice(message) {
+    const unassignedWarnings = sourceWarnings.filter(function (warning) {
+      return Number(warning.record) === 0;
+    });
+    const warningDetails = unassignedWarnings.slice(0, 5).map(function (warning) {
+      return (warning.line ? "Quellzeile " + warning.line + ": " : "") + warning.message;
+    });
+    if (unassignedWarnings.length > warningDetails.length) {
+      warningDetails.push((unassignedWarnings.length - warningDetails.length) + " weitere Quellhinweise.");
+    }
+    const parts = [message];
+    if (warningDetails.length) parts.push("Nicht zugeordnete Importhinweise: " + warningDetails.join(" "));
+    setText(recordsNotice, parts.filter(Boolean).join(" "));
+  }
+
   function fullName(record) {
     const name = record["(1) Name"] || {};
-    return [name.Vorname, name.Nachname].filter(Boolean).join(" ") || "Name fehlt";
+    return [name.Vorname, name.Nachname].filter(Boolean).join(" ") || name["Unaufgeteilter Name"] || "Name fehlt";
   }
 
   function warningCategory(message, hasLine) {
@@ -190,6 +206,9 @@
         else formatCount += 1;
       });
     });
+    importCount += sourceWarnings.filter(function (warning) {
+      return Number(warning.record) === 0;
+    }).length;
     setText(stats.total, records.length);
     setText(stats.affected, affected);
     setText(stats.import, importCount);
@@ -242,7 +261,7 @@
     setText(visibleCount, visibleIndices.length + (visibleIndices.length === 1 ? " Eintrag" : " Einträge"));
     exportButton.disabled = visibleIndices.length === 0;
     const filterText = searchInput.value.trim() ? " passend zur Suche" : "";
-    setText(recordsNotice, records.length
+    setRecordsNotice(records.length
       ? visibleIndices.length + " von " + records.length + " Einträgen werden angezeigt" + filterText + "."
       : "Noch keine Datensätze erhalten. Öffne die Übersicht über den Konverter nach dem Erzeugen einer Vorschau.");
     renderDetail();
@@ -434,8 +453,10 @@
 
   function validWarnings(value) {
     return Array.isArray(value) && value.every(function (warning) {
-      return warning && Number.isInteger(Number(warning.record)) &&
-        Number(warning.record) > 0 && typeof warning.message === "string";
+      const recordNumber = Number(warning && warning.record);
+      return warning && Number.isInteger(recordNumber) && recordNumber >= 0 &&
+        (warning.line == null || (Number.isInteger(Number(warning.line)) && Number(warning.line) > 0)) &&
+        typeof warning.message === "string";
     });
   }
 
@@ -473,12 +494,12 @@
       sourceName = safeFileName(file.name.replace(/\.json$/i, "")) || sourceName;
       rebuildProblemCache();
       renderTable();
-      setText(recordsNotice, incoming.length + (incoming.length === 1
+      setRecordsNotice(incoming.length + (incoming.length === 1
         ? " Datensatz aus " + file.name + " hinzugefügt."
         : " Datensätze aus " + file.name + " hinzugefügt."));
       sendRecordsUpdate();
     } catch (error) {
-      setText(recordsNotice, "JSON-Datei konnte nicht hinzugefügt werden: " + error.message);
+      setRecordsNotice("JSON-Datei konnte nicht hinzugefügt werden: " + error.message);
     } finally {
       importJsonInput.value = "";
     }
@@ -497,7 +518,7 @@
     link.click();
     link.remove();
     window.setTimeout(function () { URL.revokeObjectURL(url); }, 1000);
-    setText(recordsNotice, visibleRecords.length + (visibleRecords.length === 1 ? " gefilterter Eintrag wurde" : " gefilterte Einträge wurden") + " als JSON exportiert.");
+    setRecordsNotice(visibleRecords.length + (visibleRecords.length === 1 ? " gefilterter Eintrag wurde" : " gefilterte Einträge wurden") + " als JSON exportiert.");
   }
 
   function applyRecordJson() {
@@ -539,14 +560,17 @@
       const firstAddedIndex = records.length;
       records = records.concat(message.records);
       sourceWarnings = sourceWarnings.concat(message.warnings.map(function (warning) {
-        return Object.assign({}, warning, { record: Number(warning.record) + firstAddedIndex });
+        const recordNumber = Number(warning.record);
+        return Object.assign({}, warning, {
+          record: recordNumber > 0 ? recordNumber + firstAddedIndex : 0
+        });
       }));
       sourceName = safeFileName(message.sourceName);
       selectedIndex = firstAddedIndex;
       searchInput.value = "";
       issueFilter.value = "all";
       renderAll();
-      setText(recordsNotice, message.records.length + (message.records.length === 1
+      setRecordsNotice(message.records.length + (message.records.length === 1
         ? " Datensatz aus dem TUSTEP-Konverter hinzugefügt."
         : " Datensätze aus dem TUSTEP-Konverter hinzugefügt."));
       sendRecordsUpdate();

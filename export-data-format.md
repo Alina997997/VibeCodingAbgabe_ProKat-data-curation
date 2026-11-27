@@ -3,6 +3,8 @@
 
 Im Folgenden wird das Datenformat beschrieben, in dem die ProfKatalog-Daten nach der Aufarbeitung exportiert werden sollen.
 
+Leere Zeichenketten und Arrays im Schema sind Platzhalter für nicht vorhandene Quellenangaben, keine behaupteten Daten. Der Konverter ergänzt keine fehlenden biografischen Angaben; Dummy-Fotos und Anzeigehinweise der Website werden nicht in den JSON-Datensatz geschrieben.
+
 
 ---
 
@@ -88,12 +90,12 @@ Das folgende Beispiel beschreibt **einen einzelnen Datensatz**. Ein vollständig
   "(10) Ehepartner": [
     {
       "Eheschließung": "1786",
-      "Vorname": "Luise Wilhelmine Rosine",
+      "Name": "Luise Wilhelmine Rosine",
       "Vater": "Christian Gottlieb Schmid, Stadtschreiber ((oSchorndorf))"
     },
     {
       "Eheschließung": "1810",
-      "Vorname": "Friederike Beate",
+      "Name": "Friederike Beate",
       "Vater": "Karl Heinrich Rieger, Stiftsprediger und Konsistorialrat ((oStuttgart))",
       "Bemerkung": "Witwe des Gotthilf Köstlin, Diakon ((oEsslingen))"
     }
@@ -194,6 +196,7 @@ Diese folgende Anleitung beschreibt die strukturierte Transformation eines Rohda
   * `Vorname`: Der Teil nach dem Komma bis zur Klammer (`"Friedrich"` bzw. `"Jakob Friedrich"`).
   * `Geburtsjahr` / `Sterbejahr`: Die in runden Klammern angegebenen Jahreszahlen (`"1751"`, `"1829"`).
   * `#1*` wird analog als Array von Objekten unter `"(1*) Namensvarianten"` geführt.
+  * Fehlt das trennende Komma, wird kein Nach- oder Vorname geraten. Der Originaltext steht dann in `Unaufgeteilter Name`.
 
 
 
@@ -263,7 +266,7 @@ Diese folgende Anleitung beschreibt die strukturierte Transformation eines Rohda
 
 * **JSON-Konvertierung:**
   * **Eltern (`#8`, `#9`):** Werden direkt als Strings den Attributen `Vater` und `Mutter` unter `"(8+9) Eltern"` zugewiesen.
-  * **Ehepartner (`#10`):** Mehrere Eheschließungen (gekennzeichnet durch `a)`, `b)`) werden in ein Array von Objekten überführt. Jedes Objekt enthält Attribute wie `Eheschließung` (Jahr), `Vorname`, `Vater` und optional `Bemerkung` (z. B. für Witwenstatus).
+  * **Ehepartner (`#10`):** Mehrere Eheschließungen (gekennzeichnet durch `a)`, `b)`) werden in ein Array von Objekten überführt. Der Name wird wortgetreu als `Name` gespeichert; `Eheschließung` (Jahr), `Vater` und `Bemerkung` (z. B. Witwenstatus) werden nur übernommen, wenn sie im Quelltext erkennbar sind.
   * **Kinder (`#10a`):** Wird als leeres Array `[]` (oder mit entsprechenden Einträgen) repräsentiert.
 
 

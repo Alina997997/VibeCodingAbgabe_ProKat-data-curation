@@ -15,6 +15,8 @@
   const jsonOutput = document.getElementById("json-output");
   const jsonStatus = document.getElementById("json-status");
   const downloadButton = document.getElementById("download-button");
+  const openRecordsNavButton = document.getElementById("open-records-nav-button");
+  const overviewNavStatus = document.getElementById("overview-nav-status");
   const openRecordsButton = document.getElementById("open-records-button");
   const addRecordsButton = document.getElementById("add-records-button");
   const copyButton = document.getElementById("copy-button");
@@ -100,7 +102,7 @@
       !currentRecords.length || previewAddedToOverview;
     addRecordsButton.textContent = previewAddedToOverview
       ? "Bereits in Übersicht"
-      : "Datensätze zur Übersicht hinzufügen";
+      : "JSON-Datensätze zur Übersicht hinzufügen";
   }
 
   function setBackupStatus(message, state) {
@@ -139,22 +141,28 @@
   }
 
   function openRecordsWindow() {
-    if (!isPreviewCurrent || downloadButton.disabled) return;
     if (recordsWindow && !recordsWindow.closed) {
       recordsWindow.focus();
-      if (recordsWindowReady && !recordsWindowInitialized) sendRecordsToWindow();
+      overviewNavStatus.textContent = "";
+      if (recordsWindowReady && isPreviewCurrent && !downloadButton.disabled && !recordsWindowInitialized) {
+        sendRecordsToWindow();
+      }
       return;
     }
 
     recordsChannel = Date.now().toString(36) + "-" + Math.random().toString(36).slice(2);
     recordsWindowReady = false;
     recordsWindowInitialized = false;
+    overviewNavStatus.textContent = "";
     const url = new URL("records.html", window.location.href);
     url.searchParams.set("channel", recordsChannel);
     recordsWindow = window.open(url.href, "_blank");
     if (!recordsWindow) {
-      validationMessage.className = "validation-message has-errors";
-      validationMessage.textContent = "Der Browser hat das neue Fenster blockiert. Erlaube Pop-ups und klicke erneut auf „Einträge im neuen Fenster öffnen“ oder „Datensätze zur Übersicht hinzufügen“.";
+      overviewNavStatus.textContent = "Pop-up blockiert. Erlaube Pop-ups für die Eintragsübersicht.";
+      if (!previewContent.hidden) {
+        validationMessage.className = "validation-message has-errors";
+        validationMessage.textContent = overviewNavStatus.textContent;
+      }
       openRecordsButton.disabled = false;
       return;
     }
@@ -166,8 +174,11 @@
       recordsChannel = null;
       recordsWindowReady = false;
       recordsWindowInitialized = false;
-      validationMessage.className = "validation-message has-errors";
-      validationMessage.textContent = "Das neue Fenster wurde nicht bestätigt. Erlaube Pop-ups und klicke anschließend erneut auf „Einträge im neuen Fenster öffnen“ oder „Datensätze zur Übersicht hinzufügen“.";
+      overviewNavStatus.textContent = "Eintragsübersicht konnte nicht verbunden werden. Bitte erneut öffnen.";
+      if (!previewContent.hidden) {
+        validationMessage.className = "validation-message has-errors";
+        validationMessage.textContent = overviewNavStatus.textContent;
+      }
     }, 5000);
   }
 
@@ -181,8 +192,18 @@
       return;
     }
     recordsWindow.focus();
-    if (!recordsWindowReady || !recordsWindowInitialized) {
+    if (!recordsWindowReady) {
       validationMessage.textContent = "Die Eintragsübersicht wird noch verbunden. Klicke nach dem Laden erneut auf „Datensätze zur Übersicht hinzufügen“.";
+      return;
+    }
+    if (!recordsWindowInitialized) {
+      sendRecordsToWindow();
+      if (recordsWindowInitialized) {
+        validationMessage.className = "validation-message";
+        validationMessage.textContent = currentRecords.length +
+          (currentRecords.length === 1 ? " Datensatz wurde" : " Datensätze wurden") +
+          " zur Eintragsübersicht hinzugefügt.";
+      }
       return;
     }
     recordsWindow.postMessage({
@@ -203,7 +224,10 @@
 
   function validWarnings(warnings) {
     return Array.isArray(warnings) && warnings.every(function (warning) {
-      return warning && Number.isInteger(Number(warning.record)) && typeof warning.message === "string";
+      const recordNumber = Number(warning && warning.record);
+      return warning && Number.isInteger(recordNumber) && recordNumber >= 0 &&
+        (warning.line == null || (Number.isInteger(Number(warning.line)) && Number(warning.line) > 0)) &&
+        typeof warning.message === "string";
     });
   }
 
@@ -217,11 +241,20 @@
       recordsWindowReady = true;
       if (recordsReadyTimer) window.clearTimeout(recordsReadyTimer);
       recordsReadyTimer = null;
+      if (!isPreviewCurrent || downloadButton.disabled) return;
       validationMessage.className = "validation-message" + (currentWarnings.length ? " has-errors" : "");
       validationMessage.textContent = currentWarnings.length
         ? currentWarnings.length + " Hinweis" + (currentWarnings.length === 1 ? "" : "e") + " – prüfe die markierten Stellen vor dem Export."
         : "Alle " + parsedRecords + " Datensätze wurden ohne Importhinweise erkannt.";
-      if (!recordsWindowInitialized) sendRecordsToWindow();
+      if (!recordsWindowInitialized) {
+        sendRecordsToWindow();
+        if (recordsWindowInitialized) {
+          validationMessage.className = "validation-message";
+          validationMessage.textContent = currentRecords.length +
+            (currentRecords.length === 1 ? " Datensatz wurde" : " Datensätze wurden") +
+            " zur Eintragsübersicht hinzugefügt.";
+        }
+      }
       return;
     }
     if (message.type !== "prokat-records-updated" || !Array.isArray(message.records) ||
@@ -270,7 +303,10 @@
       const item = document.createElement("div");
       item.className = "issue";
       const label = document.createElement("strong");
-      label.textContent = warning.line ? "Datensatz " + warning.record + " · Zeile " + warning.line + ": " : "Datensatz " + warning.record + ": ";
+      const recordNumber = Number(warning.record);
+      label.textContent = warning.line
+        ? recordNumber > 0 ? "Datensatz " + recordNumber + " · Zeile " + warning.line + ": " : "Quellzeile " + warning.line + ": "
+        : recordNumber > 0 ? "Datensatz " + recordNumber + ": " : "Quelldaten: ";
       item.append(label, document.createTextNode(warning.message));
       issues.append(item);
     });
@@ -297,6 +333,8 @@
       renderWarnings(result.warnings);
       jsonOutput.value = "";
       jsonOutput.disabled = true;
+      jsonStatus.className = "json-status";
+      jsonStatus.innerHTML = '<span class="status-dot"></span> Kein JSON vorhanden';
       downloadButton.disabled = true;
       copyButton.disabled = true;
       recordCount.textContent = "0 Datensätze";
@@ -378,8 +416,8 @@
   });
   previewButton.addEventListener("click", function () {
     generatePreview();
-    openRecordsWindow();
   });
+  openRecordsNavButton.addEventListener("click", openRecordsWindow);
   openRecordsButton.addEventListener("click", openRecordsWindow);
   addRecordsButton.addEventListener("click", addCurrentRecordsToOverview);
   jsonOutput.addEventListener("input", function () {

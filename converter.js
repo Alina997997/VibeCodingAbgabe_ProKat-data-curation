@@ -96,7 +96,8 @@
 
     const comma = nameText.indexOf(",");
     if (comma < 0) {
-      result.Nachname = nameText.trim();
+      const unparsedName = nameText.trim();
+      if (unparsedName) result["Unaufgeteilter Name"] = unparsedName;
       warnings.push({ record: recordNumber, message: "Name ohne Komma: Nach- und Vorname konnten nicht getrennt werden." });
     } else {
       result.Nachname = nameText.slice(0, comma).trim();
@@ -152,10 +153,10 @@
         }
         const daughter = text.match(/,\s*Tochter des\s+([\s\S]*)$/i);
         if (daughter) {
-          spouse.Vorname = text.slice(0, daughter.index).trim();
+          spouse.Name = text.slice(0, daughter.index).trim();
           spouse.Vater = daughter[1].trim();
         } else {
-          spouse.Vorname = text;
+          spouse.Name = text;
         }
         return spouse;
       })
@@ -279,22 +280,37 @@
     function finishRecord() {
       if (!currentLines.length) return;
       const fields = Object.create(null);
+      const recordWarnings = [];
       currentLines.forEach(function (item) {
         const entries = splitTaggedLine(item.text);
         if (!entries) {
-          warnings.push({ record: records.length + 1, line: item.line, message: "Zeile ohne erkennbares Feldkennzeichen wurde übersprungen." });
+          recordWarnings.push({ record: records.length + 1, line: item.line, message: "Zeile ohne erkennbares Feldkennzeichen wurde übersprungen." });
           return;
         }
         entries.forEach(function (entry) {
           if (!Object.prototype.hasOwnProperty.call(FIELD_NAMES, entry.tag)) {
-            warnings.push({ record: records.length + 1, line: item.line, message: "Unbekanntes Feld #" + entry.tag + " wurde nicht in das JSON übernommen." });
+            recordWarnings.push({ record: records.length + 1, line: item.line, message: "Unbekanntes Feld #" + entry.tag + " wurde nicht in das JSON übernommen." });
             return;
           }
           if (!fields[entry.tag]) fields[entry.tag] = [];
           fields[entry.tag].push(entry.value);
         });
       });
-      records.push(convertRecord(fields, records.length + 1, warnings));
+      const hasData = Object.keys(fields).some(function (tag) {
+        return fields[tag].some(function (value) { return Boolean(value.trim()); });
+      });
+      if (!hasData) {
+        recordWarnings.forEach(function (warning) { warning.record = 0; });
+        warnings.push.apply(warnings, recordWarnings);
+        warnings.push({
+          record: 0,
+          line: currentStart,
+          message: "Quellblock enthält keine unterstützten Daten und wurde nicht als Datensatz übernommen."
+        });
+      } else {
+        records.push(convertRecord(fields, records.length + 1, recordWarnings));
+        warnings.push.apply(warnings, recordWarnings);
+      }
       currentLines = [];
     }
 
@@ -311,7 +327,7 @@
     finishRecord();
 
     if (!records.length && source.trim()) {
-      warnings.push({ record: 1, line: currentStart, message: "Keine TUSTEP-Datensätze erkannt. Prüfe Feldkennzeichen wie #0 und #1." });
+      warnings.push({ record: 0, message: "Keine TUSTEP-Datensätze erkannt. Prüfe Feldkennzeichen wie #0 und #1." });
     }
     return { records: records, warnings: warnings };
   }
