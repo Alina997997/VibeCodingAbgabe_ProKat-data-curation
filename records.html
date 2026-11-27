@@ -37,7 +37,12 @@
       <article class="stat-card stat-card-alert">
         <span class="stat-label">Einträge mit Hinweisen</span>
         <strong id="stat-affected">–</strong>
-        <span class="stat-caption">müssen geprüft werden</span>
+        <span class="stat-caption">sollten geprüft werden</span>
+      </article>
+      <article class="stat-card stat-card-alert">
+        <span class="stat-label">Fehlende PIT</span>
+        <strong id="stat-missing-pit">–</strong>
+        <span class="stat-caption">Einträge ohne Kennung</span>
       </article>
       <article class="stat-card">
         <span class="stat-label">Importprobleme</span>
@@ -61,6 +66,7 @@
         <select id="issue-filter">
           <option value="all">Alle Einträge</option>
           <option value="issues">Mit Hinweisen</option>
+          <option value="missing-pit">Fehlende PIT</option>
           <option value="import">Importprobleme</option>
           <option value="format">Formatprobleme</option>
         </select>
@@ -131,12 +137,12 @@
           <form id="record-form" class="record-form">
             <div class="form-section-heading">
               <h3>Personendaten</h3>
-              <span>Änderungen werden direkt übernommen</span>
+              <span>Änderungen werden sofort übernommen; Listen lassen sich ergänzen oder entfernen</span>
             </div>
             <div id="form-fields" class="form-fields"></div>
           </form>
 
-          <div id="additional-sections" class="additional-sections"></div>
+          <div id="additional-sections" class="additional-sections" aria-label="Weitere bearbeitbare Angaben"></div>
 
           <details class="json-details">
             <summary>JSON dieses Eintrags anzeigen / bearbeiten</summary>

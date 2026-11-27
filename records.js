@@ -29,6 +29,7 @@
   const stats = {
     total: document.getElementById("stat-total"),
     affected: document.getElementById("stat-affected"),
+    missingPit: document.getElementById("stat-missing-pit"),
     import: document.getElementById("stat-import"),
     format: document.getElementById("stat-format")
   };
@@ -54,11 +55,21 @@
   ];
 
   const displayGroups = [
+    { title: "Namensvarianten", keys: ["(1*) Namensvarianten"] },
     { title: "Universität und Fach", keys: ["(012) Uni-Angehörigkeit", "(2+3) Fakultätszugehörigkeit", "(4) Lehrfach", "(5) Konfession"] },
     { title: "Familie", keys: ["(8+9) Eltern", "(10) Ehepartner", "(10a) Kinder"] },
     { title: "Werdegang und Ämter", keys: ["(11) Bildungsgang", "(12) Berufslaufbahn", "(13) Akademische-Ämter", "(14) Titel", "(15) Mitgliedschaft Wissenschaft", "(15a) Mitgliedschaft Studium"] },
     { title: "Quellen und Nachweise", keys: ["(17) Archivalische-Quellen", "(18) Literatur", "(18a) Online-Quellen", "(19) Bildnachweise", "(20) Bemerkungen", "(21) Bearbeiter", "(23) BIB", "(24) GND"] }
   ];
+  const editableFieldPaths = new Set(editableFields.map(function (field) {
+    return JSON.stringify(field.path);
+  }));
+  const emptyArrayItemTemplates = {
+    "(1*) Namensvarianten": { PIT: "", Nachname: "", Vorname: "", Geburtsjahr: "", Sterbejahr: "" },
+    "(2+3) Fakultätszugehörigkeit": { Anfangsjahr: "", Endjahr: "", Fakultät: "" },
+    "(10) Ehepartner": { Eheschließung: "", Name: "", Vater: "", Bemerkung: "" }
+  };
+  const pendingArrayDrafts = new WeakMap();
 
   let records = [];
   let sourceWarnings = [];
@@ -125,7 +136,10 @@
   function getRecordProblems(index) {
     const record = records[index] || {};
     const problems = sourceWarnings
-      .filter(function (warning) { return Number(warning.record) === index + 1; })
+      .filter(function (warning) {
+        return Number(warning.record) === index + 1 &&
+          !/Namensfeld ohne PIT-Kennung/i.test(warning.message);
+      })
       .map(function (warning) {
         return {
           category: warningCategory(warning.message, Boolean(warning.line)),
@@ -145,6 +159,15 @@
         }
         return true;
       });
+
+    const name = record["(1) Name"] || {};
+    if (name.PIT == null || String(name.PIT).trim() === "") {
+      problems.push({
+        category: "identity",
+        message: "PIT fehlt. Trage nur eine PIT aus einer verlässlichen Quelle ein; die Übersicht ergänzt keine Kennung.",
+        path: ["(1) Name", "PIT"]
+      });
+    }
 
     const life = record["(6+7) Lebensdaten"] || {};
     [
@@ -189,6 +212,7 @@
       const record = records[index];
       const problems = problemCache[index];
       if (filter === "issues" && !problems.length) return false;
+      if (filter === "missing-pit" && !problems.some(function (problem) { return problem.category === "identity"; })) return false;
       if (filter === "import" && !problems.some(function (problem) { return problem.category === "import"; })) return false;
       if (filter === "format" && !problems.some(function (problem) { return problem.category === "format"; })) return false;
       return !query || JSON.stringify(record).toLocaleLowerCase().includes(query);
@@ -197,13 +221,15 @@
 
   function updateStatistics() {
     let affected = 0;
+    let missingPitCount = 0;
     let importCount = 0;
     let formatCount = 0;
     problemCache.forEach(function (problems) {
       if (problems.length) affected += 1;
+      if (problems.some(function (problem) { return problem.category === "identity"; })) missingPitCount += 1;
       problems.forEach(function (problem) {
         if (problem.category === "import") importCount += 1;
-        else formatCount += 1;
+        else if (problem.category === "format") formatCount += 1;
       });
     });
     importCount += sourceWarnings.filter(function (warning) {
@@ -211,6 +237,7 @@
     }).length;
     setText(stats.total, records.length);
     setText(stats.affected, affected);
+    setText(stats.missingPit, missingPitCount);
     setText(stats.import, importCount);
     setText(stats.format, formatCount);
   }
@@ -222,7 +249,7 @@
     return cell;
   }
 
-  function renderTable() {
+  function renderTable(preserveDetail) {
     visibleIndices = getVisibleIndices();
     if (!visibleIndices.includes(selectedIndex)) selectedIndex = visibleIndices.length ? visibleIndices[0] : -1;
     recordsBody.replaceChildren();
@@ -264,7 +291,7 @@
     setRecordsNotice(records.length
       ? visibleIndices.length + " von " + records.length + " Einträgen werden angezeigt" + filterText + "."
       : "Noch keine Datensätze erhalten. Öffne die Übersicht über den Konverter nach dem Erzeugen einer Vorschau.");
-    renderDetail();
+    if (!preserveDetail) renderDetail();
   }
 
   function pathValue(record, path) {
@@ -280,9 +307,59 @@
     cursor[path[path.length - 1]] = value;
   }
 
+  function refreshEditedRecord(record) {
+    const recordIndex = records.indexOf(record);
+    if (recordIndex < 0) return;
+    rebuildProblemCache();
+    renderTable(true);
+    if (selectedIndex !== recordIndex) {
+      renderDetail();
+      updateStatistics();
+      sendRecordsUpdate();
+      return;
+    }
+
+    const name = record["(1) Name"] || {};
+    const life = record["(6+7) Lebensdaten"] || {};
+    const gender = String(record["(011) Geschlecht"] || "").toLocaleLowerCase();
+    const problems = problemCache[recordIndex] || [];
+    setText(detailHeading, fullName(record));
+    setText(detailPit, "PIT " + (name.PIT || "–"));
+    setText(detailYears, [name.Geburtsjahr || "?", name.Sterbejahr || "?"].join("–"));
+    detailYears.title = [life.Geburtsdatum, life.Geburtsort, life.Sterbedatum, life.Sterbeort].filter(Boolean).join(" · ");
+    detailIssueBadge.hidden = !problems.length;
+    detailIssueBadge.className = "issue-badge" + (problems.length ? " has-issue" : "");
+    setText(detailIssueBadge, problems.length ? problems.length + " Hinweis" + (problems.length === 1 ? "" : "e") : "");
+    dummyPhoto.classList.toggle("gender-male", gender === "männlich" || gender === "m");
+    dummyPhoto.classList.toggle("gender-female", gender === "weiblich" || gender === "w");
+    setText(photoCaption, "Dummy-Foto · " + (record["(011) Geschlecht"] || "keine Angabe"));
+    renderIssues(problems);
+    Array.from(detailView.querySelectorAll("[data-path]")).forEach(function (control) {
+      const path = JSON.parse(control.dataset.path);
+      const field = control.closest(".form-field");
+      const hasIssue = hasPathProblem(problems, path);
+      field.classList.toggle("field-has-issue", hasIssue);
+      if (hasInvalidPathProblem(problems, path)) control.setAttribute("aria-invalid", "true");
+      else control.removeAttribute("aria-invalid");
+    });
+    jsonEditor.value = JSON.stringify(record, null, 2);
+    setText(jsonStatus, "JSON nicht geändert");
+    jsonStatus.className = "json-status";
+    updateStatistics();
+    sendRecordsUpdate();
+  }
+
   function hasPathProblem(problems, path) {
     return problems.some(function (problem) {
       return problem.path && problem.path.length === path.length &&
+        problem.path.every(function (segment, index) { return segment === path[index]; });
+    });
+  }
+
+  function hasInvalidPathProblem(problems, path) {
+    return problems.some(function (problem) {
+      return problem.category !== "identity" && problem.path &&
+        problem.path.length === path.length &&
         problem.path.every(function (segment, index) { return segment === path[index]; });
     });
   }
@@ -301,79 +378,306 @@
       control.dataset.path = JSON.stringify(field.path);
       if (hasPathProblem(problems, field.path)) {
         label.classList.add("field-has-issue");
-        control.setAttribute("aria-invalid", "true");
+        if (hasInvalidPathProblem(problems, field.path)) control.setAttribute("aria-invalid", "true");
       }
-      control.addEventListener("change", function () {
-        setPathValue(record, field.path, control.value.trim());
-        rebuildProblemCache();
-        renderTable();
-        sendRecordsUpdate();
+      control.addEventListener("input", function () {
+        setPathValue(record, field.path, control.value);
+        refreshEditedRecord(record);
       });
       label.append(caption, control);
       formFields.append(label);
     });
   }
 
-  function appendValue(container, value) {
-    if (value == null || value === "") {
-      const empty = document.createElement("span");
-      empty.className = "empty-value";
-      empty.textContent = "Keine Angabe";
-      container.append(empty);
-      return;
+  function getArrayDrafts(record) {
+    let drafts = pendingArrayDrafts.get(record);
+    if (!drafts) {
+      drafts = new Map();
+      pendingArrayDrafts.set(record, drafts);
     }
+    return drafts;
+  }
+
+  function hasEnteredValue(value) {
+    if (value == null) return false;
+    if (typeof value === "string") return Boolean(value.trim());
+    if (Array.isArray(value)) return value.some(hasEnteredValue);
+    if (typeof value === "object") return Object.keys(value).some(function (key) {
+      return hasEnteredValue(value[key]);
+    });
+    return true;
+  }
+
+  function updateArray(record, path, index) {
+    const values = pathValue(record, path);
+    values.splice(index, 1);
+    rebuildProblemCache();
+    renderTable();
+    sendRecordsUpdate();
+  }
+
+  function startArrayDraft(record, path, values) {
+    const drafts = getArrayDrafts(record);
+    const key = JSON.stringify(path);
+    if (drafts.has(key)) return;
+    const template = emptyArrayItemTemplates[path[0]];
+    const value = values.length ? emptyValueLike(values[0]) : template ? emptyValueLike(template) : "";
+    drafts.set(key, { value: value, changed: false });
+    renderDetail();
+  }
+
+  function finishArrayDraft(record, path, commit) {
+    const drafts = getArrayDrafts(record);
+    const key = JSON.stringify(path);
+    const draft = drafts.get(key);
+    if (!draft) return;
+    if (commit) {
+      if (!draft.changed || !hasEnteredValue(draft.value)) return;
+      pathValue(record, path).push(cleanDraftValue(draft.value));
+    }
+    drafts.delete(key);
+    if (commit) {
+      rebuildProblemCache();
+      renderTable();
+      sendRecordsUpdate();
+    } else {
+      renderDetail();
+    }
+  }
+
+  function emptyValueLike(value) {
+    if (Array.isArray(value)) return [];
+    if (value && typeof value === "object") {
+      return Object.keys(value).reduce(function (result, key) {
+        result[key] = emptyValueLike(value[key]);
+        return result;
+      }, {});
+    }
+    return "";
+  }
+
+  function cleanDraftValue(value) {
     if (Array.isArray(value)) {
-      if (!value.length) {
+      return value.filter(hasEnteredValue).map(cleanDraftValue);
+    }
+    if (value && typeof value === "object") {
+      return Object.keys(value).reduce(function (result, key) {
+        const cleaned = cleanDraftValue(value[key]);
+        if (hasEnteredValue(cleaned)) result[key] = cleaned;
+        return result;
+      }, {});
+    }
+    return value;
+  }
+
+  function updateDraftArray(draftContext, path, operation, index) {
+    const values = path.length ? pathValue(draftContext.draft.value, path) : draftContext.draft.value;
+    if (operation === "add") {
+      values.push(values.length ? emptyValueLike(values[0]) : "");
+    } else {
+      values.splice(index, 1);
+    }
+    draftContext.draft.changed = true;
+    draftContext.refresh();
+  }
+
+  function renderPrimitiveEditor(container, label, value, path, record, problems, draftContext) {
+    if (editableFieldPaths.has(JSON.stringify(path))) return false;
+    const field = document.createElement("label");
+    field.className = "form-field is-wide";
+    const caption = document.createElement("span");
+    caption.className = "field-label";
+    caption.textContent = label;
+    const booleanValue = typeof value === "boolean";
+    const multiline = typeof value === "string" && (value.length > 100 || value.includes("\n"));
+    const control = document.createElement(booleanValue ? "select" : multiline ? "textarea" : "input");
+    if (booleanValue) {
+      ["true", "false"].forEach(function (optionValue) {
+        const option = document.createElement("option");
+        option.value = optionValue;
+        option.textContent = optionValue === "true" ? "Ja" : "Nein";
+        control.append(option);
+      });
+    } else if (!multiline) {
+      control.type = typeof value === "number" ? "number" : "text";
+      if (typeof value === "number") control.step = "any";
+    }
+    control.value = value == null ? "" : String(value);
+    control.dataset.path = JSON.stringify(path);
+    if (hasPathProblem(problems, path)) {
+      field.classList.add("field-has-issue");
+      control.setAttribute("aria-invalid", "true");
+    }
+    const updateValue = function () {
+      const updatedValue = booleanValue
+        ? control.value === "true"
+        : typeof value === "number" && control.value !== "" ? Number(control.value) : control.value;
+      if (draftContext) {
+        if (path.length) setPathValue(draftContext.draft.value, path, updatedValue);
+        else draftContext.draft.value = updatedValue;
+        draftContext.draft.changed = true;
+        draftContext.commitButton.disabled = !hasEnteredValue(draftContext.draft.value);
+        return;
+      }
+      setPathValue(record, path, updatedValue);
+      refreshEditedRecord(record);
+    };
+    control.addEventListener(booleanValue ? "change" : "input", updateValue);
+    field.append(caption, control);
+    container.append(field);
+    return true;
+  }
+
+  function renderEditableNode(container, label, value, path, record, problems, draftContext) {
+    if (Array.isArray(value)) {
+      const draftKey = JSON.stringify(path);
+      const draft = draftContext ? null : getArrayDrafts(record).get(draftKey);
+      const group = document.createElement("div");
+      group.className = "editable-collection is-wide";
+      const heading = document.createElement("span");
+      heading.className = "field-label";
+      heading.textContent = label;
+      group.append(heading);
+
+      const entries = document.createElement("div");
+      entries.className = "editable-array";
+      value.forEach(function (item, index) {
+        const row = document.createElement("div");
+        row.className = "editable-array-item";
+        const content = document.createElement("div");
+        content.className = "editable-array-value";
+        renderEditableNode(content, "Eintrag " + (index + 1), item, path.concat(index), record, problems, draftContext);
+        const removeButton = document.createElement("button");
+        removeButton.className = "button button-secondary array-action";
+        removeButton.type = "button";
+        removeButton.textContent = "Entfernen";
+        removeButton.setAttribute("aria-label", label + ": Eintrag " + (index + 1) + " entfernen");
+        removeButton.addEventListener("mousedown", function (event) { event.preventDefault(); });
+        removeButton.addEventListener("click", function () {
+          if (draftContext) updateDraftArray(draftContext, path.concat(index), "remove");
+          else updateArray(record, path, index);
+        });
+        row.append(content, removeButton);
+        entries.append(row);
+      });
+      if (!value.length && !draft) {
         const empty = document.createElement("span");
         empty.className = "empty-value";
         empty.textContent = "Keine Einträge";
-        container.append(empty);
-        return;
+        entries.append(empty);
       }
-      const list = document.createElement("ul");
-      value.forEach(function (item) {
-        const entry = document.createElement("li");
-        appendValue(entry, item);
-        list.append(entry);
+      if (draft) {
+        const row = document.createElement("div");
+        row.className = "editable-array-item is-draft";
+        const content = document.createElement("div");
+        content.className = "editable-array-value";
+        const note = document.createElement("span");
+        note.className = "empty-value draft-note";
+        note.textContent = "Wird erst nach Eingabe und Übernahme gespeichert. Leere Angaben werden ausgelassen.";
+        const actions = document.createElement("div");
+        actions.className = "array-draft-actions";
+        const commitButton = document.createElement("button");
+        commitButton.className = "button button-primary array-action";
+        commitButton.type = "button";
+        commitButton.textContent = "Eintrag übernehmen";
+        commitButton.disabled = !draft.changed || !hasEnteredValue(draft.value);
+        commitButton.addEventListener("mousedown", function (event) { event.preventDefault(); });
+        commitButton.addEventListener("click", function () {
+          finishArrayDraft(record, path, true);
+        });
+        const cancelButton = document.createElement("button");
+        cancelButton.className = "button button-secondary array-action";
+        cancelButton.type = "button";
+        cancelButton.textContent = "Verwerfen";
+        cancelButton.addEventListener("mousedown", function (event) { event.preventDefault(); });
+        cancelButton.addEventListener("click", function () {
+          finishArrayDraft(record, path, false);
+        });
+        const context = {
+          draft: draft,
+          commitButton: commitButton,
+          refresh: function () { renderDetail(); }
+        };
+        renderEditableNode(content, "Neuer Eintrag", draft.value, [], record, problems, context);
+        actions.append(commitButton, cancelButton);
+        content.append(note);
+        row.append(content, actions);
+        entries.append(row);
+      }
+      const addButton = document.createElement("button");
+      addButton.className = "button button-secondary array-action";
+      addButton.type = "button";
+      addButton.textContent = draft ? "Eintrag in Bearbeitung" : "Eintrag hinzufügen";
+      addButton.disabled = Boolean(draft);
+      addButton.addEventListener("mousedown", function (event) { event.preventDefault(); });
+      addButton.addEventListener("click", function () {
+        if (draftContext) updateDraftArray(draftContext, path, "add");
+        else startArrayDraft(record, path, value);
       });
-      container.append(list);
-      return;
+      group.append(entries, addButton);
+      container.append(group);
+      return true;
     }
-    if (typeof value === "object") {
-      const list = document.createElement("dl");
+
+    if (value && typeof value === "object") {
+      const group = document.createElement("div");
+      group.className = "editable-object is-wide";
+      const heading = document.createElement("span");
+      heading.className = "field-label";
+      heading.textContent = label;
+      const fields = document.createElement("div");
+      fields.className = "editable-object-fields";
+      let rendered = 0;
       Object.keys(value).forEach(function (key) {
-        const term = document.createElement("dt");
-        term.textContent = key;
-        const description = document.createElement("dd");
-        appendValue(description, value[key]);
-        list.append(term, description);
+        if (renderEditableNode(fields, key, value[key], path.concat(key), record, problems, draftContext)) rendered += 1;
       });
-      container.append(list);
-      return;
+      if (!rendered) return false;
+      group.append(heading, fields);
+      container.append(group);
+      return true;
     }
-    const text = document.createElement("span");
-    text.textContent = String(value);
-    container.append(text);
+
+    return renderPrimitiveEditor(container, label, value, path, record, problems, draftContext);
   }
 
   function renderAdditional(record) {
     additionalSections.replaceChildren();
+    const problems = problemCache[selectedIndex] || [];
+    const groupedKeys = new Set();
     displayGroups.forEach(function (group) {
       const section = document.createElement("section");
       section.className = "detail-block";
       const heading = document.createElement("h3");
       heading.textContent = group.title;
-      const list = document.createElement("dl");
+      const fields = document.createElement("div");
+      fields.className = "editable-section-fields";
       group.keys.forEach(function (key) {
-        const term = document.createElement("dt");
-        term.textContent = key;
-        const description = document.createElement("dd");
-        appendValue(description, record[key]);
-        list.append(term, description);
+        if (!Object.prototype.hasOwnProperty.call(record, key)) return;
+        if (renderEditableNode(fields, key, record[key], [key], record, problems)) groupedKeys.add(key);
       });
-      section.append(heading, list);
-      additionalSections.append(section);
+      if (fields.childElementCount) {
+        section.append(heading, fields);
+        additionalSections.append(section);
+      }
     });
+
+    const knownGroupKeys = new Set(displayGroups.reduce(function (keys, group) {
+      return keys.concat(group.keys);
+    }, []));
+    const otherFields = document.createElement("div");
+    otherFields.className = "editable-section-fields";
+    Object.keys(record).forEach(function (key) {
+      if (knownGroupKeys.has(key) || groupedKeys.has(key)) return;
+      renderEditableNode(otherFields, key, record[key], [key], record, problems);
+    });
+    if (otherFields.childElementCount) {
+      const section = document.createElement("section");
+      section.className = "detail-block";
+      const heading = document.createElement("h3");
+      heading.textContent = "Weitere Angaben";
+      section.append(heading, otherFields);
+      additionalSections.append(section);
+    }
   }
 
   function renderIssues(problems) {
@@ -390,9 +694,10 @@
     const list = document.createElement("ul");
     problems.forEach(function (problem) {
       const item = document.createElement("li");
-      item.className = problem.category === "import" ? "problem-import" : "problem-format";
+      item.className = "problem-" + problem.category;
       const type = document.createElement("strong");
-      type.textContent = problem.category === "import" ? "Importproblem · " : "Formatproblem · ";
+      const labels = { import: "Importproblem", format: "Formatproblem", identity: "Kennungshinweis" };
+      type.textContent = (labels[problem.category] || "Hinweis") + " · ";
       item.append(type, document.createTextNode(problem.message));
       list.append(item);
     });
