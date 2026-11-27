@@ -20,6 +20,12 @@
   const detailIssueBadge = document.getElementById("detail-issue-badge");
   const dummyPhoto = document.getElementById("dummy-photo");
   const photoCaption = document.getElementById("photo-caption");
+  const portraitImage = document.getElementById("portrait-image");
+  const portraitPlaceholder = document.getElementById("portrait-placeholder");
+  const portraitFileInput = document.getElementById("portrait-file-input");
+  const choosePortraitButton = document.getElementById("choose-portrait");
+  const removePortraitButton = document.getElementById("remove-portrait");
+  const portraitStatus = document.getElementById("portrait-status");
   const recordIssues = document.getElementById("record-issues");
   const formFields = document.getElementById("form-fields");
   const additionalSections = document.getElementById("additional-sections");
@@ -132,6 +138,19 @@
     return JSON.stringify(field.path);
   }));
   const digitalResourceKey = "Digitale Ressourcen";
+  const portraitMimeTypes = new Set(["image/jpeg", "image/png", "image/webp", "image/gif", "image/avif", "image/bmp"]);
+  const portraitExtensions = {
+    bmp: "image/bmp",
+    gif: "image/gif",
+    jpeg: "image/jpeg",
+    jpg: "image/jpeg",
+    png: "image/png",
+    avif: "image/avif",
+    webp: "image/webp"
+  };
+  let displayedPortraitRecord = null;
+  let displayedPortraitResource = null;
+  let portraitObjectUrl = "";
   const appManagedFields = new Set([digitalResourceKey]);
   const emptyArrayItemTemplates = {
     "(1*) Namensvarianten": { PIT: "", Nachname: "", Vorname: "", Geburtsjahr: "", Sterbejahr: "" },
@@ -1650,7 +1669,7 @@
     setText(detailIssueBadge, problems.length ? problems.length + " Hinweis" + (problems.length === 1 ? "" : "e") : "");
     dummyPhoto.classList.toggle("gender-male", gender === "männlich" || gender === "m");
     dummyPhoto.classList.toggle("gender-female", gender === "weiblich" || gender === "w");
-    setText(photoCaption, "Dummy-Foto · " + (record["(011) Geschlecht"] || "keine Angabe"));
+    renderPortrait(record);
     renderIssues(problems);
     Array.from(detailView.querySelectorAll("[data-path]")).forEach(function (control) {
       const path = JSON.parse(control.dataset.path);
@@ -2012,6 +2031,126 @@
     return amount.toFixed(amount < 10 ? 1 : 0) + " " + units[unitIndex];
   }
 
+  function isPortraitResource(resource) {
+    return resource && typeof resource === "object" && !Array.isArray(resource) &&
+      resource.Typ === "Datei" && resource.Verwendung === "Profilbild";
+  }
+
+  function portraitMediaType(file) {
+    const mediaType = String(file.type || "").toLowerCase();
+    if (mediaType === "image/jpg") return "image/jpeg";
+    if (portraitMimeTypes.has(mediaType)) return mediaType;
+    if (mediaType && mediaType !== "application/octet-stream") return "";
+    const extension = String(file.name || "").split(".").pop().toLowerCase();
+    return portraitExtensions[extension] || "";
+  }
+
+  function setPortraitStatusForRecord(record, message, isError) {
+    if (records[selectedIndex] === record) {
+      portraitStatus.textContent = message;
+      portraitStatus.classList.toggle("is-error", Boolean(isError));
+    } else if (message) {
+      setRecordsNotice(fullName(record) + ": " + message);
+    }
+  }
+
+  function clearPortraitObjectUrl() {
+    if (!portraitObjectUrl) return;
+    URL.revokeObjectURL(portraitObjectUrl);
+    portraitObjectUrl = "";
+  }
+
+  function showPortraitPlaceholder(caption, hasPortrait) {
+    portraitImage.onload = null;
+    portraitImage.onerror = null;
+    portraitImage.removeAttribute("src");
+    portraitImage.alt = "";
+    clearPortraitObjectUrl();
+    portraitImage.hidden = true;
+    portraitPlaceholder.hidden = false;
+    removePortraitButton.hidden = !hasPortrait;
+    choosePortraitButton.textContent = hasPortrait ? "Foto ersetzen" : "Foto auswählen";
+    photoCaption.textContent = caption;
+    photoCaption.title = caption;
+    dummyPhoto.setAttribute("aria-label", caption);
+  }
+
+  function renderPortrait(record) {
+    let resource = null;
+    try {
+      resource = digitalResourceArray(record, false).find(isPortraitResource) || null;
+    } catch (error) {
+      if (displayedPortraitRecord !== record || displayedPortraitResource !== null) {
+        displayedPortraitRecord = record;
+        displayedPortraitResource = null;
+        showPortraitPlaceholder("Dummy-Foto · " + (record["(011) Geschlecht"] || "keine Angabe"), false);
+      }
+      setPortraitStatusForRecord(record, "Personenfoto kann nicht geladen werden: " + error.message, true);
+      return;
+    }
+    if (displayedPortraitRecord === record && displayedPortraitResource === resource) {
+      if (resource) {
+        portraitImage.alt = "Personenfoto von " + fullName(record);
+        dummyPhoto.setAttribute("aria-label", "Personenfoto von " + fullName(record));
+      } else {
+        const caption = "Dummy-Foto · " + (record["(011) Geschlecht"] || "keine Angabe");
+        photoCaption.textContent = caption;
+        photoCaption.title = caption;
+        dummyPhoto.setAttribute("aria-label", caption);
+      }
+      return;
+    }
+
+    displayedPortraitRecord = record;
+    displayedPortraitResource = resource;
+    showPortraitPlaceholder(
+      resource ? "Foto wird geladen …" : "Dummy-Foto · " + (record["(011) Geschlecht"] || "keine Angabe"),
+      Boolean(resource)
+    );
+    if (!resource) {
+      setPortraitStatusForRecord(record, "", false);
+      return;
+    }
+
+    try {
+      const mediaType = String(resource.Medientyp || "").toLowerCase();
+      if (!portraitMimeTypes.has(mediaType)) throw new Error("Der Medientyp ist kein unterstütztes Bildformat.");
+      const blob = new Blob([digitalResourceBytes(resource)], { type: mediaType });
+      const objectUrl = URL.createObjectURL(blob);
+      portraitObjectUrl = objectUrl;
+      portraitImage.alt = "Personenfoto von " + fullName(record);
+      portraitImage.onerror = function () {
+        if (portraitObjectUrl !== objectUrl) return;
+        showPortraitPlaceholder("Foto nicht verfügbar", true);
+        setPortraitStatusForRecord(record, "Das gespeicherte Personenfoto kann nicht angezeigt werden.", true);
+      };
+      portraitImage.src = objectUrl;
+      portraitImage.hidden = false;
+      portraitPlaceholder.hidden = true;
+      photoCaption.textContent = resource.Dateiname || resource.Titel || "Personenfoto";
+      photoCaption.title = photoCaption.textContent;
+      dummyPhoto.setAttribute("aria-label", "Personenfoto von " + fullName(record));
+      setPortraitStatusForRecord(record, "", false);
+    } catch (error) {
+      photoCaption.textContent = "Foto nicht verfügbar";
+      photoCaption.title = photoCaption.textContent;
+      dummyPhoto.setAttribute("aria-label", "Personenfoto nicht verfügbar");
+      setPortraitStatusForRecord(record, "Gespeichertes Personenfoto kann nicht angezeigt werden: " + error.message, true);
+    }
+  }
+
+  function digitalResourceBytes(resource) {
+    const base64 = resource && resource.InhaltBase64;
+    const emptyFile = resource && resource.GroesseBytes === 0 && base64 === "";
+    if (typeof base64 !== "string" || (!base64 && !emptyFile) || !/^[A-Za-z0-9+/]*={0,2}$/.test(base64)) {
+      throw new Error("Der eingebettete Dateiinhalt fehlt oder ist ungültig.");
+    }
+    const binary = window.atob(base64);
+    const bytes = new Uint8Array(binary.length);
+    for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
+    return bytes;
+  }
+
   function removeDigitalResource(record, resourceIndex) {
     let resources;
     try {
@@ -2026,15 +2165,7 @@
 
   function downloadDigitalResource(resource) {
     try {
-      const base64 = resource && resource.InhaltBase64;
-      const emptyFile = resource && resource.GroesseBytes === 0 && base64 === "";
-      if (typeof base64 !== "string" || (!base64 && !emptyFile) || !/^[A-Za-z0-9+/]*={0,2}$/.test(base64)) {
-        throw new Error("Der eingebettete Dateiinhalt fehlt oder ist ungültig.");
-      }
-      const binary = window.atob(base64);
-      const bytes = new Uint8Array(binary.length);
-      for (let index = 0; index < binary.length; index += 1) bytes[index] = binary.charCodeAt(index);
-      const blob = new Blob([bytes], { type: "application/octet-stream" });
+      const blob = new Blob([digitalResourceBytes(resource)], { type: "application/octet-stream" });
       const downloadUrl = URL.createObjectURL(blob);
       const link = document.createElement("a");
       link.href = downloadUrl;
@@ -2113,7 +2244,7 @@
         meta.className = "digital-resource-meta";
         meta.textContent = fileName + (formatDigitalFileSize(resource.GroesseBytes)
           ? " · " + formatDigitalFileSize(resource.GroesseBytes)
-          : "");
+          : "") + (isPortraitResource(resource) ? " · Personenfoto" : "");
         details.append(title, meta);
         actions.append(resourceAction("Herunterladen", function () {
           downloadDigitalResource(resource);
@@ -2193,6 +2324,79 @@
       });
       reader.readAsDataURL(file);
     });
+  }
+
+  function validatePortraitFile(file) {
+    return new Promise(function (resolve, reject) {
+      const objectUrl = URL.createObjectURL(file);
+      const image = new Image();
+      image.addEventListener("load", function () {
+        URL.revokeObjectURL(objectUrl);
+        resolve();
+      }, { once: true });
+      image.addEventListener("error", function () {
+        URL.revokeObjectURL(objectUrl);
+        reject(new Error("Die Datei enthält kein lesbares Bild."));
+      }, { once: true });
+      image.src = objectUrl;
+    });
+  }
+
+  async function attachPortraitFile(file) {
+    const record = records[selectedIndex];
+    if (!record || !file) return;
+    const mediaType = portraitMediaType(file);
+    if (!mediaType) {
+      setPortraitStatusForRecord(record, "Bitte wähle ein JPEG-, PNG-, GIF-, WebP-, AVIF- oder BMP-Bild aus.", true);
+      return;
+    }
+    setPortraitStatusForRecord(record, "Personenfoto wird gelesen …", false);
+    try {
+      await validatePortraitFile(file);
+      const content = await readDigitalFile(file);
+      const resources = digitalResourceArray(record, true);
+      const portrait = {
+        Typ: "Datei",
+        Verwendung: "Profilbild",
+        Titel: file.name,
+        Dateiname: file.name,
+        Medientyp: mediaType,
+        GroesseBytes: file.size,
+        InhaltBase64: content
+      };
+      for (let index = resources.length - 1; index >= 0; index -= 1) {
+        if (isPortraitResource(resources[index])) resources.splice(index, 1);
+      }
+      resources.push(portrait);
+      if (!commitDigitalResourceChange(record, "Personenfoto gespeichert.")) {
+        setPortraitStatusForRecord(record, "Personenfoto konnte nicht gespeichert werden. Prüfe den JSON-Datensatz.", true);
+        return;
+      }
+      setPortraitStatusForRecord(record, "Personenfoto gespeichert.", false);
+    } catch (error) {
+      setPortraitStatusForRecord(record, "Personenfoto konnte nicht hinzugefügt werden: " + error.message, true);
+    }
+  }
+
+  function removePortrait(record) {
+    let resources;
+    try {
+      resources = digitalResourceArray(record, false);
+    } catch (error) {
+      setPortraitStatusForRecord(record, error.message, true);
+      return;
+    }
+    let removed = false;
+    for (let index = resources.length - 1; index >= 0; index -= 1) {
+      if (isPortraitResource(resources[index])) {
+        resources.splice(index, 1);
+        removed = true;
+      }
+    }
+    if (!removed) return;
+    if (commitDigitalResourceChange(record, "Personenfoto entfernt.")) {
+      setPortraitStatusForRecord(record, "Personenfoto entfernt.", false);
+    }
   }
 
   async function attachDigitalFiles(files) {
@@ -2307,6 +2511,9 @@
     if (selectedIndex < 0 || !records[selectedIndex]) {
       detailEmpty.hidden = false;
       detailView.hidden = true;
+      displayedPortraitRecord = null;
+      displayedPortraitResource = null;
+      clearPortraitObjectUrl();
       return;
     }
     const record = records[selectedIndex];
@@ -2325,7 +2532,7 @@
     setText(detailIssueBadge, problems.length ? problems.length + " Hinweis" + (problems.length === 1 ? "" : "e") : "");
     dummyPhoto.classList.toggle("gender-male", gender === "männlich" || gender === "m");
     dummyPhoto.classList.toggle("gender-female", gender === "weiblich" || gender === "w");
-    setText(photoCaption, "Dummy-Foto · " + (record["(011) Geschlecht"] || "keine Angabe"));
+    renderPortrait(record);
     const birthDeath = [life.Geburtsdatum, life.Geburtsort, life.Sterbedatum, life.Sterbeort].filter(Boolean).join(" · ");
     detailYears.title = birthDeath;
     renderIssues(problems);
@@ -2525,6 +2732,16 @@
   closeAnalyticsButton.addEventListener("click", function () { analyticsDialog.close(); });
   addDigitalLinkButton.addEventListener("click", addDigitalLink);
   chooseDigitalFilesButton.addEventListener("click", function () { digitalFileInput.click(); });
+  choosePortraitButton.addEventListener("click", function () { portraitFileInput.click(); });
+  removePortraitButton.addEventListener("click", function () {
+    const record = records[selectedIndex];
+    if (record) removePortrait(record);
+  });
+  portraitFileInput.addEventListener("change", function () {
+    const file = portraitFileInput.files && portraitFileInput.files[0];
+    portraitFileInput.value = "";
+    if (file) attachPortraitFile(file);
+  });
   digitalFileInput.addEventListener("change", function () {
     const files = Array.from(digitalFileInput.files || []);
     digitalFileInput.value = "";

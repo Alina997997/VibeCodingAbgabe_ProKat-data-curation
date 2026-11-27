@@ -68,6 +68,8 @@ Alle Visualisierungen sind lesende Auswertungen: Sie ändern weder die Quelldate
 
 Im Detailbereich eines Datensatzes lassen sich Weblinks und lokale Dateien mit der ausgewählten Person verknüpfen. Links müssen mit HTTP oder HTTPS beginnen. Anhänge werden in den Datensatz eingebettet und beim JSON-Export sowie im Backup mitgespeichert; sie werden nicht an einen Server übertragen. Die Dateien werden Base64-kodiert und vergrößern dadurch JSON-Exporte und Backups. Eine anwendungsseitige Dateigrößenbegrenzung gibt es nicht, aber sehr große Dateien können den Browser verlangsamen oder dessen Speichergrenzen erreichen. Behandle Anhänge und Backups als personenbezogene, nicht verschlüsselte Daten.
 
+Über **Foto auswählen** lässt sich außerdem ein Personenfoto hochladen. Es wird als Datei-Ressource mit `"Verwendung": "Profilbild"` gespeichert, im JSON-Export mitgeführt und kann später ersetzt oder entfernt werden. Unterstützt werden JPEG, PNG, GIF, WebP, AVIF und BMP; SVG wird nicht als Foto angezeigt.
+
 Die optionalen Einträge stehen im Datensatz unter `Digitale Ressourcen`. Das Format ist im Abschnitt „Optionale digitale Ressourcen in der Eintragsübersicht“ in `export-data-format.md` beschrieben.
 
 ### Lokales Backup für einen Rechnerwechsel

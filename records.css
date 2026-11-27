@@ -115,9 +115,10 @@ tbody tr.row-has-issue td:first-child { box-shadow: inset 3px 0 #d29368; }
 .detail-empty strong { font: 700 13px Manrope, sans-serif; }
 .detail-empty p { max-width: 250px; margin: 7px 0 0; color: #849087; font-size: 10px; line-height: 1.6; }
 .identity { display: flex; align-items: center; gap: 14px; margin: 12px 0 15px; }
-.dummy-photo { width: 82px; height: 98px; flex: 0 0 82px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; overflow: hidden; border: 1px solid #dfe9e1; border-radius: 8px; background: #edf3ee; }
+.dummy-photo { position: relative; width: 82px; height: 98px; flex: 0 0 82px; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 2px; overflow: hidden; border: 1px solid #dfe9e1; border-radius: 8px; background: #edf3ee; }
 .dummy-photo svg { width: 70px; height: 70px; margin-top: 4px; }
-.dummy-photo span { color: #718076; font-size: 8px; font-weight: 600; }
+.dummy-photo .portrait-image { position: absolute; inset: 0; width: 100%; height: 100%; object-fit: cover; }
+.dummy-photo span { position: absolute; right: 0; bottom: 0; left: 0; overflow: hidden; padding: 4px 3px; color: #718076; background: rgba(237, 243, 238, .92); font-size: 8px; font-weight: 600; text-align: center; text-overflow: ellipsis; white-space: nowrap; }
 .portrait-face { fill: #e4bd9f; }
 .portrait-hair { fill: #526e5a; }
 .portrait-body { fill: #668f72; }
@@ -125,6 +126,10 @@ tbody tr.row-has-issue td:first-child { box-shadow: inset 3px 0 #d29368; }
 .gender-female .portrait-hair { fill: #84654e; }
 .gender-female .portrait-body { fill: #a97a70; }
 .identity-copy { min-width: 0; }
+.photo-controls { display: flex; flex-wrap: wrap; align-items: center; gap: 6px; margin-top: 9px; }
+.photo-controls .button { min-height: 30px; height: auto; padding: 6px 9px; font-size: 10px; }
+.portrait-status { flex-basis: 100%; color: #78847b; font-size: 10px; line-height: 1.5; }
+.portrait-status.is-error { color: #a55343; }
 .identity-pit { color: #62806c; font: 10px var(--mono); }
 .identity-copy h2 { margin-top: 4px; font-size: 22px; overflow-wrap: anywhere; }
 .detail-years { margin: 5px 0 0; color: #78847b; font-size: 11px; }
@@ -426,7 +431,9 @@ tbody tr.row-has-issue td:first-child { box-shadow: inset 3px 0 #d9a565; }
   background: #354438;
 }
 .dummy-photo.gender-female { border-color: #735e50; background: #3b302b; }
-.dummy-photo span { color: #e1dbc9; }
+.dummy-photo span { color: #e1dbc9; background: rgba(53, 68, 56, .94); }
+.portrait-status { color: #b7c3b9; }
+.portrait-status.is-error { color: #ffb9a7; }
 .identity-pit { color: #d7bd80; }
 .detail-years { color: var(--muted); }
 .issue-badge { color: #f1d8b0; background: #403326; }

@@ -180,6 +180,8 @@ Die Eintragsübersicht kann pro Person zusätzlich das optionale Array `"Digital
 
 Die Base64-Kodierung vergrößert die JSON-Datei. Es gibt keine anwendungsseitige Dateigrößenbegrenzung; der verfügbare Arbeitsspeicher des Browsers setzt praktische Grenzen. Sensible Anhänge und Backups sind nicht verschlüsselt.
 
+Ein Personenfoto kann in der Eintragsübersicht hochgeladen werden. Es wird wie eine Datei unter `"Digitale Ressourcen"` gespeichert und zusätzlich mit `"Verwendung": "Profilbild"` gekennzeichnet. Unterstützt werden JPEG, PNG, GIF, WebP, AVIF und BMP; SVG-Dateien werden nicht als Foto angezeigt. Ein neues Foto ersetzt vorhandene Profilbild-Ressourcen dieses Datensatzes.
+
 ----
 
 # Konvertierungsanleitung
