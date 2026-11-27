@@ -1,13 +1,18 @@
 :root {
-  color-scheme: light;
-  --ink: #17231e;
-  --muted: #748078;
-  --line: #e5e9e3;
-  --paper: #fff;
-  --canvas: #f5f7f3;
-  --green: #2f7255;
-  --green-dark: #20583f;
-  --green-pale: #e9f2ec;
+  color-scheme: dark;
+  --ink: #eee9d9;
+  --muted: #c0bfaf;
+  --line: #45564a;
+  --paper: #21332a;
+  --canvas: #14231d;
+  --green: #c4aa72;
+  --green-dark: #a98c53;
+  --green-pale: #354438;
+  --brass: #c4aa72;
+  --surface-inset: #182820;
+  --surface-raised: #293b31;
+  --success: #c4d2b8;
+  --danger: #f0b9a7;
   --mono: "DM Mono", "Cascadia Code", Consolas, monospace;
   font-family: "DM Sans", "Segoe UI", sans-serif;
   background: var(--canvas);
@@ -344,3 +349,219 @@ tbody tr.row-has-issue td:first-child { box-shadow: inset 3px 0 #d29368; }
   .gender-chart-row { grid-template-columns: minmax(80px, .7fr) minmax(90px, 1.2fr); gap: 6px; }
   .gender-chart-counts { grid-column: 1 / -1; }
 }
+
+.records-topbar {
+  background: #0d1914;
+  border-bottom-color: #927a4d;
+}
+.brand, .brand-divider, .brand-section { color: var(--ink); }
+.brand-mark span { background: #b89a5f; }
+.brand-mark span:nth-child(4) { background: #e2d4b4; }
+.connection-status { color: var(--muted); }
+.connection-status.is-connected { color: var(--success); }
+.connection-status.is-error { color: var(--danger); }
+.eyebrow, .panel-kicker { color: var(--muted); }
+.eyebrow-line { background: var(--brass); }
+h1, h2 { font-family: Georgia, "Times New Roman", serif; letter-spacing: 0; }
+h1 span { color: var(--brass); }
+.intro-copy { color: var(--muted); }
+.stat-card {
+  border-color: var(--line);
+  background: var(--paper);
+}
+.stat-label, .stat-caption { color: var(--muted); }
+.stat-card-alert strong { color: var(--danger); }
+.toolbar {
+  border-color: var(--line);
+  background: #1a2a22;
+}
+.search-control, .filter-control select {
+  border-color: #526254;
+  color: var(--ink);
+  background: var(--surface-inset);
+}
+.search-control input { color: var(--ink); }
+.search-control input::placeholder { color: #a9ad9e; }
+.search-control:focus-within, .form-field input:focus,
+.form-field textarea:focus, .form-field select:focus {
+  border-color: var(--brass);
+  box-shadow: 0 0 0 3px rgba(196,170,114,.25);
+}
+.filter-control { color: var(--muted); }
+.button-primary { color: #17231d; background: var(--green); }
+.button-primary:hover:not(:disabled) { background: var(--green-dark); }
+.button-primary:disabled { color: #f0eadb; background: #657265; }
+.button-secondary {
+  border-color: #526254;
+  color: var(--ink);
+  background: var(--surface-raised);
+}
+.button-secondary:hover:not(:disabled) { border-color: var(--brass); background: #34483a; }
+.table-panel, .detail-panel {
+  border-color: var(--line);
+  border-top: 2px solid var(--brass);
+  background: var(--paper);
+  box-shadow: 0 4px 14px rgba(0,0,0,.18);
+}
+.panel-kicker { color: var(--muted); }
+.count-badge { color: var(--muted); background: var(--surface-raised); }
+.table-wrap { border-top-color: var(--line); }
+thead { background: var(--surface-raised); }
+th { border-bottom-color: var(--line); color: var(--muted); }
+td { border-bottom-color: #34443a; color: #d3d4c8; }
+tbody tr:hover { background: #2b3c32; }
+tbody tr:focus-visible { box-shadow: inset 0 0 0 3px var(--brass); }
+tbody tr.is-selected { background: #354438; }
+tbody tr.row-has-issue td:first-child { box-shadow: inset 3px 0 #d9a565; }
+.person-cell { color: var(--ink); }
+.table-badge.clean { color: #dce7d4; background: #354438; }
+.table-badge.has-issue { color: #f1d8b0; background: #403326; }
+.list-empty, .records-notice { color: var(--muted); }
+.empty-art { color: var(--brass); }
+.empty-art i { background: #526254; }
+.detail-empty strong { color: var(--ink); }
+.detail-empty p { color: var(--muted); }
+.dummy-photo {
+  border-color: #526254;
+  background: #354438;
+}
+.dummy-photo.gender-female { border-color: #735e50; background: #3b302b; }
+.dummy-photo span { color: #e1dbc9; }
+.identity-pit { color: #d7bd80; }
+.detail-years { color: var(--muted); }
+.issue-badge { color: #f1d8b0; background: #403326; }
+.record-issues h3, .detail-block h3, .form-section-heading h3 { color: var(--ink); }
+.record-issues li {
+  border-left-color: #d4ae69;
+  color: #f0d9a8;
+  background: #3a3023;
+}
+.record-issues li.problem-import { border-color: #e29b84; color: #f2c7b9; background: #402b27; }
+.record-issues li.problem-format { border-color: #e0bc73; }
+.record-issues li.problem-identity { border-color: #a7bd8a; color: #dce7d4; background: #2b392a; }
+.no-issues { color: #dce7d4; background: #2b392a; }
+.form-section-heading span, .field-label { color: var(--muted); }
+.form-field input, .form-field textarea, .form-field select,
+.map-location-review select, .family-candidate-select, .analytics-filter select {
+  border-color: #526254;
+  color: var(--ink);
+  background: var(--surface-inset);
+}
+.form-field.field-has-issue input, .form-field.field-has-issue textarea,
+.form-field.field-has-issue select { border-color: #d9a565; background: #342d23; }
+.detail-block, .digital-resource-item, .editable-object, .editable-array-item.is-draft,
+.json-details {
+  border-color: var(--line);
+  background: var(--surface-inset);
+}
+.digital-resource-help, .digital-resource-meta, .digital-resource-empty,
+.digital-resource-status, .detail-block dt, .detail-block dd,
+.digital-resource-link, .draft-note { color: var(--muted); }
+.digital-resource-title, .editable-object { color: var(--ink); }
+.digital-resource-link { color: #d7bd80; }
+.digital-resource-meta.is-error, .digital-resource-status.is-error,
+.digital-resource-empty.is-error { color: var(--danger); }
+.detail-block dd .empty-value, .empty-value { color: #aaa99d; }
+.json-details summary { color: #e2d4b4; }
+.json-help, .json-status, .records-footer { color: var(--muted); }
+.json-editor {
+  border-color: #45564a;
+  color: #e5dfce;
+  background: var(--surface-inset);
+}
+.json-editor:focus { border-color: var(--brass); box-shadow: 0 0 0 3px rgba(196,170,114,.25); }
+.json-status.is-valid { color: var(--success); }
+.json-status.is-invalid { color: var(--danger); }
+.map-dialog, .family-dialog, .analytics-dialog {
+  border-color: var(--line);
+  color: var(--ink);
+  background: var(--canvas);
+}
+.map-dialog::backdrop, .family-dialog::backdrop, .analytics-dialog::backdrop {
+  background: rgba(5,12,8,.78);
+}
+.map-data-notice, .family-notice, .analytics-notice {
+  border-left-color: var(--brass);
+  color: var(--ink);
+  background: var(--surface-raised);
+}
+.map-data-notice a { color: #e2c987; }
+.map-status, .map-legend, .family-status, .analytics-filter,
+.analytics-explanation, .analytics-legend { color: var(--muted); }
+.places-map { border-color: var(--line); }
+.map-review-panel, .map-location-review, .family-node, .family-group,
+.family-relation, .analytics-summary-card, .analytics-section,
+.faculty-person-node, .analytics-empty {
+  border-color: var(--line);
+  color: var(--ink);
+  background: var(--paper);
+}
+.map-review-panel h3, .map-location-review strong, .family-group h3,
+.family-relation-name, .analytics-section > h3, .analytics-summary-card strong,
+.faculty-network-hub { color: var(--ink); }
+.map-review-panel > p, .map-location-review p, .family-relation-detail,
+.family-empty, .analytics-summary-card span, .analytics-section h4,
+.analytics-table th, .analytics-table td, .analytics-bar-label,
+.analytics-bar-value, .gender-chart-label, .gender-chart-counts,
+.timeline-source, .timeline-undated, .map-empty { color: var(--muted); }
+.map-location-review { background: var(--surface-inset); }
+.family-root-node, .faculty-network-hub { border-color: var(--brass); }
+.family-relation-role, .timeline-source-label { color: #d7bd80; }
+.analytics-table th, .analytics-table td { border-bottom-color: var(--line); }
+.analytics-table th { background: var(--surface-raised); }
+.analytics-bars, .gender-chart-row { border-color: var(--line); }
+.analytics-bar-track, .gender-chart-track { background: #354438; }
+.analytics-bar-fill { background: var(--brass); }
+.gender-chart-male { background: #93bda5; }
+.gender-chart-female { background: #e3a0a4; }
+.analytics-legend .male { background: #93bda5; }
+.analytics-legend .female { background: #e3a0a4; }
+.timeline-list::before { background: #526254; }
+.timeline-event::before { border-color: #c4aa72; background: var(--paper); }
+.timeline-years { color: #e2c987; }
+.faculty-network-hub { background: #354438; }
+.faculty-network-members::before { border-color: #7f927c; }
+.faculty-person-node { color: var(--ink); }
+.faculty-person-node:hover { border-color: var(--brass); background: var(--surface-raised); }
+.analytics-empty { color: var(--muted); background: var(--surface-inset); }
+button:focus-visible, a:focus-visible, input:focus-visible,
+select:focus-visible, textarea:focus-visible {
+  outline: 3px solid #d5bb7a;
+  outline-offset: 2px;
+}
+
+@media (max-width: 700px) {
+  .records-topbar {
+    flex-wrap: wrap;
+    row-gap: 8px;
+    padding: 9px 14px;
+  }
+  .topbar-actions { gap: 8px; margin-left: auto; }
+}
+
+.detail-panel .identity-copy h2 { font-size: 24px; }
+.detail-panel .detail-years { font-size: 12px; }
+.record-issues li { font-size: 11px; line-height: 1.65; }
+.record-issues h3, .detail-block h3, .form-section-heading h3 { font-size: 14px; }
+.form-section-heading span { font-size: 10px; }
+.field-label { font-size: 12px; }
+.form-field input, .form-field textarea, .form-field select {
+  min-height: 40px;
+  padding: 8px 10px;
+  font: 13px/1.55 "Segoe UI", Arial, sans-serif;
+}
+.form-field textarea { min-height: 76px; }
+.detail-block dt { font-size: 11px; line-height: 1.5; }
+.detail-block dd { font-size: 12px; line-height: 1.65; }
+.detail-block dd dl { gap: 5px 8px; }
+.detail-block ul, .detail-block dl ul { gap: 5px; }
+.digital-resource-help { font-size: 11px; line-height: 1.65; }
+.digital-resource-empty { font-size: 11px; }
+.digital-resource-title { font-size: 12px; }
+.digital-resource-link, .digital-resource-meta { font-size: 11px; line-height: 1.6; }
+.digital-resource-status { font-size: 11px; line-height: 1.6; }
+.digital-resource-meta.is-error, .digital-resource-status.is-error,
+.digital-resource-empty.is-error { color: #ffb9a7; }
+.digital-resource-actions .button { font-size: 10px; }
+.draft-note { font-size: 11px; }
+.array-action { min-height: 32px; height: auto; font-size: 10px; }
