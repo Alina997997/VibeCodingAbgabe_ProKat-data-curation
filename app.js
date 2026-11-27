@@ -214,7 +214,7 @@
       updateSourceCount();
       resetPreview();
     } catch (error) {
-      showFileError("Die Beispieldatei konnte nicht geladen werden. Starte die lokale WebApp über einen Webserver und versuche es erneut (" + error.message + ").");
+      showFileError("Die Beispieldatei konnte nicht automatisch geladen werden. Starte einen lokalen Webserver oder wähle import-data-example.txt manuell über „Datei auswählen“ aus (" + error.message + ").");
     } finally {
       sampleButton.disabled = false;
     }

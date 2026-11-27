@@ -87,8 +87,7 @@ Nachdem der lokale Webserver gestartet wurde, können Sie die Webseite in Ihrem 
 
 Hiermit greift der Browser direkt auf den eigenen Rechner zu und kommuniziert mit dem gestarteten lokalen Webserver, wodurch die Webseite im vollen Funktionsumfang ausgeführt werden kann.
 
-Ein *direktes Öffnen* der HTML-Dateien im Browser (z.B. durch Doppelklick auf die Datei) *ist nicht ausreichend*, da dies nicht die volle Funktionalität der Webseite gewährleistet.
-In diesem Fall können nicht alle Dateien der Webseite korrekt geladen werden, sodass die Webseite nicht wie vorgesehen funktioniert.
+Ein direktes Öffnen von `index.html` funktioniert auch ohne Python für Datei-Upload, Umwandlung, Vorschau und Export. Aus Sicherheitsgründen kann der Browser dabei die Beispieldatei nicht automatisch laden. Wähle in diesem Fall `import-data-example.txt` manuell über **Datei auswählen** aus. Für den automatischen Beispieldaten-Button empfiehlt sich der lokale Webserver.
 
 
 ### Schritt 4 - Beenden des lokalen Webservers
