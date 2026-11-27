@@ -73,6 +73,7 @@
       </label>
       <button id="import-json-button" class="button button-secondary" type="button">JSON-Datei hinzufügen</button>
       <input id="import-json-input" class="visually-hidden" type="file" accept=".json,application/json" aria-label="JSON-Datei auswählen">
+      <button id="create-map" class="button button-secondary" type="button" title="Erstellt eine Karte aus den aktuell sichtbaren Einträgen; Internet erforderlich." disabled>Karte erstellen</button>
       <button id="export-filtered" class="button button-primary" type="button" disabled>
         Sichtbare Einträge als JSON exportieren
         <svg viewBox="0 0 20 20" aria-hidden="true"><path d="M10 3v10m0 0 3.5-3.5M10 13 6.5 9.5M4 14v2.5A.5.5 0 0 0 4.5 17h11a.5.5 0 0 0 .5-.5V14"/></svg>
@@ -131,6 +132,9 @@
               <span id="detail-issue-badge" class="issue-badge" hidden></span>
             </div>
           </div>
+          <div class="detail-actions">
+            <button id="create-person-map" class="button button-secondary" type="button" title="Erstellt eine Karte nur mit den Orten dieses Datensatzes; Internet erforderlich.">Karte für diese Person erstellen</button>
+          </div>
 
           <section id="record-issues" class="record-issues" aria-live="polite"></section>
 
@@ -156,6 +160,37 @@
         </div>
       </section>
     </div>
+
+    <dialog id="map-dialog" class="map-dialog" aria-labelledby="map-title">
+      <div class="map-dialog-inner">
+        <header class="map-dialog-header">
+          <div>
+            <div class="panel-kicker">03 · ORTSÜBERSICHT</div>
+            <h2 id="map-title">Orte auf der Karte</h2>
+          </div>
+          <button id="close-map" class="button button-secondary" type="button">Schließen</button>
+        </header>
+        <p class="map-data-notice">
+          Zur Verortung werden nur Ortsnamen an <a href="https://photon.komoot.io/" target="_blank" rel="noopener noreferrer">Photon</a> (OpenStreetMap-Daten) gesendet, keine Personen- oder Biografiedaten. Die Kartenkacheln werden online von <a href="https://tile.openstreetmap.de/" target="_blank" rel="noopener noreferrer">OpenStreetMap Deutschland</a> bereitgestellt. Mehrere gleichlautende Treffer erscheinen mit einer gestrichelten Markierung als ungeprüfter Vorschlag; wähle rechts den passenden Treffer ausdrücklich aus. Weitere Ortsnennungen bleiben ihrem Quellfeld zugeordnet und gelten nicht automatisch als Wohnorte.
+        </p>
+        <p id="map-status" class="map-status" role="status" aria-live="polite"></p>
+        <div class="map-legend" aria-label="Legende">
+          <span><i class="map-legend-dot birth"></i>Geburtsort</span>
+          <span><i class="map-legend-dot death"></i>Sterbeort</span>
+          <span><i class="map-legend-dot mention"></i>Weitere Ortsnennung</span>
+          <span><i class="map-legend-dot candidate"></i>Mehrdeutiger Vorschlag</span>
+        </div>
+        <div class="map-content">
+          <div id="places-map" class="places-map" aria-label="Karte der Ortsangaben"></div>
+          <aside class="map-review-panel" aria-labelledby="map-review-title">
+            <h3 id="map-review-title">Treffer prüfen</h3>
+            <p>Gestrichelte Markierungen sind mehrdeutig. Wähle hier den passenden Ort ausdrücklich aus.</p>
+            <div id="map-unresolved" class="map-unresolved"></div>
+          </aside>
+        </div>
+      </div>
+    </dialog>
+
     <footer class="records-footer">
       <span>Alle Änderungen bleiben in dieser Browser-Sitzung.</span>
       <span>Zum dauerhaften Speichern das Backup im Konverter herunterladen.</span>

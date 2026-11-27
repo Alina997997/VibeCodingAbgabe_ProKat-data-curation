@@ -4,9 +4,9 @@
 Um den ProKat Datensatz für die weitere Analyse vorzubereiten, wird in diesem Repository eine grafische Benutzeroberfläche bereitgestellt. 
 Diese dienen der Überprüfung, Bereinigung, und Transformation der Daten und zu ihrem Export im anvisierten Datenformat.
 
-Da es sich bei diesem Datensatz um einen **personenbezogenen** Datensatz handelt, ist es wichtig, dass alle Datenverarbeitungsschritte lokal durchgeführt werden und keine sensiblen Informationen an externe Dienste weitergegeben werden. 
-Hierzu zählt auch, dass der **Datensatz selbst nicht in diesem Repository** enthalten ist.
-Zudem darf der Datensatz nicht durch Anwendungen von Drittanbietern, insbesondere durch KI-gestützte Tools, verarbeitet werden, da dies ein Risiko für die Privatsphäre der betroffenen Personen darstellen könnte.
+Da es sich bei diesem Datensatz um einen **personenbezogenen** Datensatz handelt, werden Import, Umwandlung, Bearbeitung und Export lokal im Browser durchgeführt. Der **Datensatz selbst ist nicht in diesem Repository** enthalten und wird nicht als Ganzes an externe Dienste übertragen.
+Die optionale Kartenfunktion ist eine begrenzte Ausnahme: Für die Ortsverortung werden einzelne Ortsnamen an einen externen Geocodierungsdienst gesendet; Personen- und Biografiedaten werden dabei nicht übertragen. Weitere Hinweise dazu stehen im Abschnitt „Orte kartografisch darstellen“.
+Der Datensatz darf nicht durch Anwendungen von Drittanbietern, insbesondere durch KI-gestützte Tools, verarbeitet werden, da dies ein Risiko für die Privatsphäre der betroffenen Personen darstellen könnte.
 
 Haupziel dieses Repository ist es, ein benutzerfreundliches Werkzeug bereitzustellen, das es ermöglicht, den ProKat Datensatz (oder Teile davon) effizient und sicher zu verarbeiten und in einem standardisierten Format für die weitere Analyse bereitzustellen.
 
@@ -45,6 +45,12 @@ Die lokale WebApp liest TUSTEP-Textdateien ein und wandelt die erkannten Datens�
 5. Exportiere aus der Übersicht die gerade sichtbaren Datensätze als JSON. Der Konverter bietet zusätzlich den Export des vollständigen JSON-Arrays.
 
 Import, Umwandlung, Bearbeitung und Backup laufen im Browser. TUSTEP- und JSON-Daten werden nicht an einen Server übertragen. Die Beispieldatei wird vom lokalen Webserver geladen.
+
+### Orte kartografisch darstellen
+
+In der Eintragsübersicht erstellt **Karte erstellen** eine Karte aus den aktuell sichtbaren Datensätzen. In der Detailansicht einer ausgewählten Person erstellt **Karte für diese Person erstellen** dagegen eine Karte nur für diesen Datensatz. Dafür werden Geburts- und Sterbeorte sowie Ortsmarkierungen `((o...))` aus den übrigen Feldern ausgewertet. Namensgleiche Treffer werden als gestrichelte, unbestätigte Vorschläge eingezeichnet und bleiben zur manuellen Auswahl markiert; einzelne alternative Suchtreffer erscheinen ebenfalls unbestätigt. Weitere Ortsnennungen werden mit ihrem Quellfeld beschriftet und nicht automatisch als Wohnorte interpretiert.
+
+Die Karte benötigt eine Internetverbindung. Für die Ortssuche wird [Photon](https://photon.komoot.io/) mit OpenStreetMap-Daten verwendet; die Kartenkacheln liefert [OpenStreetMap Deutschland](https://tile.openstreetmap.de/) auf Grundlage von [OpenStreetMap-Daten](https://www.openstreetmap.org/copyright). An den Ortsdienst werden nur eindeutige Ortsnamen gesendet, keine Namen von Personen, PITs oder Biografietexte. Die Anfragen erfolgen einzeln und höchstens einmal pro Sekunde; Suchergebnisse werden lokal im Browser zwischengespeichert. Eindeutige Namens-Treffer erscheinen als Vorschläge; mehrdeutige Treffer müssen ausgewählt werden, nicht gefundene Orte bleiben unverortet. Koordinaten sind externe Vorschläge und werden nicht in die JSON-Datensätze übernommen.
 
 ### Lokales Backup für einen Rechnerwechsel
 

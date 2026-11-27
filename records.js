@@ -26,6 +26,14 @@
   const jsonEditor = document.getElementById("record-json-editor");
   const jsonStatus = document.getElementById("record-json-status");
   const applyJsonButton = document.getElementById("apply-json");
+  const createMapButton = document.getElementById("create-map");
+  const createPersonMapButton = document.getElementById("create-person-map");
+  const mapDialog = document.getElementById("map-dialog");
+  const mapTitle = document.getElementById("map-title");
+  const mapStatus = document.getElementById("map-status");
+  const mapElement = document.getElementById("places-map");
+  const mapUnresolved = document.getElementById("map-unresolved");
+  const closeMapButton = document.getElementById("close-map");
   const stats = {
     total: document.getElementById("stat-total"),
     affected: document.getElementById("stat-affected"),
@@ -70,6 +78,7 @@
     "(10) Ehepartner": { Eheschließung: "", Name: "", Vater: "", Bemerkung: "" }
   };
   const pendingArrayDrafts = new WeakMap();
+  const geocodeCacheKey = "prokat-map-geocode-cache-v1";
 
   let records = [];
   let sourceWarnings = [];
@@ -78,6 +87,16 @@
   let visibleIndices = [];
   let selectedIndex = -1;
   let notifyTimer = null;
+  let leafletLoadPromise = null;
+  let placeMap = null;
+  let placeLayer = null;
+  let mapRequestController = null;
+  let mapGeneration = 0;
+  let lastGeocodeRequest = 0;
+  let geocodeCache = new Map();
+  let geocodeCacheLoaded = false;
+  let geocodeCacheWritable = true;
+  let geocodeCacheNotice = "";
 
   function safeFileName(name) {
     return String(name || "prokat")
@@ -242,6 +261,475 @@
     setText(stats.format, formatCount);
   }
 
+  function normalizePlace(value) {
+    return String(value || "").replace(/^\s*\(\(o([\s\S]*?)\)\)\s*$/, "$1").replace(/\s+/g, " ").trim();
+  }
+
+  function placeKey(value) {
+    return normalizePlace(value).normalize("NFC").toLocaleLowerCase("de");
+  }
+
+  function addMapPlace(places, value, reference) {
+    const place = normalizePlace(value);
+    if (!place) return;
+    const key = placeKey(place);
+    let location = places.get(key);
+    if (!location) {
+      location = {
+        place: place,
+        references: [],
+        features: [],
+        selectedFeature: null,
+        matchType: "",
+        requiresReview: false,
+        marker: null,
+        error: ""
+      };
+      places.set(key, location);
+    }
+    const referenceKey = [reference.record, reference.person, reference.type, reference.field].join("|");
+    if (!location.references.some(function (item) { return item.key === referenceKey; })) {
+      location.references.push(Object.assign({ key: referenceKey }, reference));
+    }
+  }
+
+  function locationFieldLabel(path) {
+    return path.map(function (part) {
+      return typeof part === "number" ? "Eintrag " + (part + 1) : part;
+    }).join(" › ");
+  }
+
+  function collectTaggedPlaces(value, path, person, places) {
+    if (typeof value === "string") {
+      const marker = /\(\(o([\s\S]*?)\)\)/g;
+      let match;
+      while ((match = marker.exec(value)) !== null) {
+        addMapPlace(places, match[1], {
+          person: person.person,
+          record: person.record,
+          type: "Weitere Ortsnennung",
+          field: locationFieldLabel(path)
+        });
+      }
+      return;
+    }
+    if (Array.isArray(value)) {
+      value.forEach(function (item, index) {
+        collectTaggedPlaces(item, path.concat(index), person, places);
+      });
+      return;
+    }
+    if (value && typeof value === "object") {
+      Object.keys(value).forEach(function (key) {
+        collectTaggedPlaces(value[key], path.concat(key), person, places);
+      });
+    }
+  }
+
+  function collectMapPlaces(indices) {
+    const places = new Map();
+    indices.forEach(function (recordIndex) {
+      const record = records[recordIndex] || {};
+      const person = fullName(record);
+      const recordNumber = recordIndex + 1;
+      const life = record["(6+7) Lebensdaten"] || {};
+      addMapPlace(places, life.Geburtsort, {
+        person: person,
+        record: recordNumber,
+        type: "Geburtsort",
+        field: "(6+7) Lebensdaten › Geburtsort"
+      });
+      addMapPlace(places, life.Sterbeort, {
+        person: person,
+        record: recordNumber,
+        type: "Sterbeort",
+        field: "(6+7) Lebensdaten › Sterbeort"
+      });
+      collectTaggedPlaces(life["(7a) Begräbnisdaten"], ["(6+7) Lebensdaten", "(7a) Begräbnisdaten"], {
+        person: person,
+        record: recordNumber
+      }, places);
+      Object.keys(record).forEach(function (key) {
+        if (key === "(1) Name" || key === "(1*) Namensvarianten" || key === "(6+7) Lebensdaten") return;
+        collectTaggedPlaces(record[key], [key], { person: person, record: recordNumber }, places);
+      });
+    });
+    return Array.from(places.values());
+  }
+
+  function normalizePlaceForMatch(value) {
+    return normalizePlace(value)
+      .normalize("NFD")
+      .replace(/[\u0300-\u036f]/g, "")
+      .toLocaleLowerCase("de")
+      .replace(/[.,/()'’-]+/g, " ")
+      .replace(/\s+/g, " ")
+      .trim();
+  }
+
+  function normalizePhotonFeature(feature) {
+    const coordinates = feature && (feature.coordinates || feature.geometry && feature.geometry.coordinates);
+    if (!Array.isArray(coordinates) || !Number.isFinite(Number(coordinates[0])) ||
+        !Number.isFinite(Number(coordinates[1])) || Math.abs(Number(coordinates[0])) > 180 ||
+        Math.abs(Number(coordinates[1])) > 90) return null;
+    const sourceProperties = feature.properties || {};
+    const properties = {};
+    ["name", "city", "district", "county", "state", "country", "postcode"].forEach(function (key) {
+      if (typeof sourceProperties[key] === "string") properties[key] = sourceProperties[key];
+    });
+    return {
+      coordinates: [Number(coordinates[0]), Number(coordinates[1])],
+      properties: properties
+    };
+  }
+
+  function loadGeocodeCache() {
+    if (geocodeCacheLoaded) return;
+    geocodeCacheLoaded = true;
+    try {
+      const saved = window.localStorage.getItem(geocodeCacheKey);
+      if (!saved) return;
+      const parsed = JSON.parse(saved);
+      if (!parsed || typeof parsed !== "object" || Array.isArray(parsed)) {
+        throw new Error("Der lokale Ortscache hat ein ungültiges Format.");
+      }
+      Object.keys(parsed).forEach(function (key) {
+        const entry = parsed[key];
+        if (!entry || !Array.isArray(entry.features)) return;
+        const features = entry.features.map(normalizePhotonFeature).filter(Boolean);
+        geocodeCache.set(key, features);
+      });
+    } catch (error) {
+      geocodeCacheNotice = "Der lokale Ortscache ist nicht verfügbar; bereits verortete Orte müssen eventuell erneut gesucht werden.";
+      console.warn("Geocoding-Cache konnte nicht geladen werden.", error);
+    }
+  }
+
+  function saveGeocodeCache() {
+    if (!geocodeCacheWritable) return;
+    try {
+      const saved = {};
+      geocodeCache.forEach(function (features, key) {
+        saved[key] = { features: features };
+      });
+      window.localStorage.setItem(geocodeCacheKey, JSON.stringify(saved));
+    } catch (error) {
+      geocodeCacheWritable = false;
+      geocodeCacheNotice = "Der lokale Ortscache konnte nicht gespeichert werden; bereits verortete Orte werden nur bis zum Schließen der Seite zwischengespeichert.";
+      console.warn("Geocoding-Cache konnte nicht gespeichert werden.", error);
+    }
+  }
+
+  function leafletLibrary() {
+    if (window.L) return Promise.resolve(window.L);
+    if (leafletLoadPromise) return leafletLoadPromise;
+    const stylesheet = document.createElement("link");
+    stylesheet.rel = "stylesheet";
+    stylesheet.href = "https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.css";
+    document.head.append(stylesheet);
+    leafletLoadPromise = new Promise(function (resolve, reject) {
+      const script = document.createElement("script");
+      script.src = "https://cdn.jsdelivr.net/npm/leaflet@1.9.4/dist/leaflet.js";
+      script.onload = function () {
+        if (window.L) resolve(window.L);
+        else reject(new Error("Leaflet wurde geladen, ist aber nicht verfügbar."));
+      };
+      script.onerror = function () {
+        leafletLoadPromise = null;
+        reject(new Error("Die Kartenbibliothek konnte nicht geladen werden."));
+      };
+      document.head.append(script);
+    });
+    return leafletLoadPromise;
+  }
+
+  function initializePlaceMap(L) {
+    if (!placeMap) {
+      placeMap = L.map(mapElement).setView([48.5, 9.5], 5);
+      L.tileLayer("https://tile.openstreetmap.de/{z}/{x}/{y}.png", {
+        maxZoom: 19,
+        attribution: '&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap-Mitwirkende</a> · Kacheln: <a href="https://tile.openstreetmap.de/">OpenStreetMap Deutschland</a>'
+      }).addTo(placeMap);
+      placeLayer = L.layerGroup().addTo(placeMap);
+    }
+    placeLayer.clearLayers();
+    window.setTimeout(function () { placeMap.invalidateSize(); }, 50);
+  }
+
+  function featureTitle(feature) {
+    const properties = feature.properties || {};
+    return properties.name || properties.city || properties.county || properties.state || "Unbenannter Ort";
+  }
+
+  function featureDescription(feature) {
+    const properties = feature.properties || {};
+    const title = featureTitle(feature);
+    return [properties.city, properties.district, properties.county, properties.state, properties.country]
+      .filter(function (part, index, parts) { return part && part !== title && parts.indexOf(part) === index; })
+      .join(", ");
+  }
+
+  function featureMatchesPlace(feature, place) {
+    const expected = normalizePlaceForMatch(place);
+    const properties = feature.properties || {};
+    return [properties.name, properties.city].some(function (candidate) {
+      return candidate && normalizePlaceForMatch(candidate) === expected;
+    });
+  }
+
+  function fetchPhotonFeatures(place, signal) {
+    loadGeocodeCache();
+    const key = placeKey(place);
+    if (geocodeCache.has(key)) return Promise.resolve(geocodeCache.get(key));
+    const wait = Math.max(0, 1000 - (Date.now() - lastGeocodeRequest));
+    return new Promise(function (resolve) { window.setTimeout(resolve, wait); })
+      .then(function () {
+        if (signal.aborted) {
+          const error = new Error("Kartensuche abgebrochen.");
+          error.name = "AbortError";
+          throw error;
+        }
+        lastGeocodeRequest = Date.now();
+        const url = "https://photon.komoot.io/api/?q=" + encodeURIComponent(place) + "&limit=5&lang=de";
+        const requestController = new AbortController();
+        const abortRequest = function () { requestController.abort(); };
+        let timedOut = false;
+        const timeout = window.setTimeout(function () {
+          timedOut = true;
+          requestController.abort();
+        }, 15000);
+        signal.addEventListener("abort", abortRequest, { once: true });
+        return fetch(url, {
+          signal: requestController.signal,
+          headers: { Accept: "application/geo+json, application/json" }
+        }).catch(function (error) {
+          if (timedOut) throw new Error("Zeitüberschreitung beim Ortsdienst.");
+          throw error;
+        }).finally(function () {
+          window.clearTimeout(timeout);
+          signal.removeEventListener("abort", abortRequest);
+        });
+      })
+      .then(function (response) {
+        if (!response.ok) throw new Error("Ortsdienst antwortete mit HTTP " + response.status + ".");
+        return response.json();
+      })
+      .then(function (payload) {
+        const features = Array.isArray(payload.features)
+          ? payload.features.map(normalizePhotonFeature).filter(Boolean)
+          : [];
+        geocodeCache.set(key, features);
+        saveGeocodeCache();
+        return features;
+      });
+  }
+
+  function createMapPopup(location, matchType) {
+    const popup = document.createElement("div");
+    const title = document.createElement("strong");
+    title.textContent = location.place;
+    const note = document.createElement("p");
+    if (matchType === "manual") {
+      note.textContent = "Von dir ausgewählter Photon-Treffer; Koordinaten nicht in den Quelldaten bestätigt.";
+    } else if (matchType === "suggestion") {
+      note.textContent = "Einziger Photon-Treffer (unbestätigter Vorschlag); das Quellfeld belegt keinen Wohnort.";
+    } else if (matchType === "ambiguous") {
+      note.textContent = "Erster von mehreren gleichlautenden Photon-Treffern (unbestätigt); bitte prüfe die Auswahl rechts.";
+    } else {
+      note.textContent = "Photon-Treffer mit übereinstimmendem Namen (nicht geprüft); das Quellfeld belegt keinen Wohnort.";
+    }
+    const references = document.createElement("ul");
+    location.references.forEach(function (reference) {
+      const item = document.createElement("li");
+      item.textContent = reference.person + " (Datensatz " + reference.record + ") · " + reference.type + " · " + reference.field;
+      references.append(item);
+    });
+    popup.append(title, note, references);
+    return popup;
+  }
+
+  function plotMapLocation(location, feature, matchType) {
+    const L = window.L;
+    const categories = new Set(location.references.map(function (reference) { return reference.type; }));
+    const color = categories.size === 1 && categories.has("Geburtsort")
+      ? "#398357"
+      : categories.size === 1 && categories.has("Sterbeort") ? "#b35345" : "#607ca0";
+    if (location.marker) placeLayer.removeLayer(location.marker);
+    const markerOptions = {
+      radius: 7,
+      color: color,
+      fillColor: color,
+      fillOpacity: matchType === "ambiguous" ? 0.55 : 0.85,
+      weight: 1.5
+    };
+    if (matchType === "ambiguous") markerOptions.dashArray = "2 3";
+    const marker = L.circleMarker([feature.coordinates[1], feature.coordinates[0]], markerOptions).addTo(placeLayer);
+    marker.bindPopup(createMapPopup(location, matchType));
+    location.marker = marker;
+    location.selectedFeature = feature;
+    location.matchType = matchType;
+    location.requiresReview = matchType === "ambiguous";
+  }
+
+  function renderUnresolvedLocations(locations) {
+    mapUnresolved.replaceChildren();
+    const unresolved = locations.filter(function (location) {
+      return !location.selectedFeature || location.requiresReview;
+    });
+    if (!unresolved.length) {
+      const empty = document.createElement("p");
+      empty.className = "map-empty";
+      empty.textContent = "Alle eindeutigen Treffer sind als Vorschläge eingezeichnet oder wurden von dir ausgewählt.";
+      mapUnresolved.append(empty);
+      return;
+    }
+    unresolved.forEach(function (location) {
+      const card = document.createElement("article");
+      card.className = "map-location-review";
+      const title = document.createElement("strong");
+      title.textContent = location.place;
+      const detail = document.createElement("p");
+      const sourceLabels = Array.from(new Set(location.references.map(function (reference) {
+        return reference.person + " (Datensatz " + reference.record + ") · " +
+          reference.type + " · " + reference.field;
+      })));
+      detail.textContent = location.references.length + (location.references.length === 1 ? " Nennung: " : " Nennungen: ") +
+        sourceLabels.join("; ") + (location.error ? " · " + location.error : "");
+      card.append(title, detail);
+      if (location.features.length) {
+        const select = document.createElement("select");
+        select.setAttribute("aria-label", "Passenden Kartenort für " + location.place + " auswählen");
+        const placeholder = document.createElement("option");
+        placeholder.value = "";
+        placeholder.textContent = "Treffer auswählen …";
+        select.append(placeholder);
+        location.features.forEach(function (feature, index) {
+          const option = document.createElement("option");
+          option.value = String(index);
+          option.textContent = [featureTitle(feature), featureDescription(feature)].filter(Boolean).join(" — ");
+          select.append(option);
+        });
+        const applyButton = document.createElement("button");
+        applyButton.type = "button";
+        applyButton.className = "button button-secondary";
+        applyButton.textContent = "Ausgewählten Treffer einzeichnen";
+        applyButton.disabled = true;
+        select.addEventListener("change", function () { applyButton.disabled = select.value === ""; });
+        applyButton.addEventListener("click", function () {
+          if (select.value === "") return;
+          plotMapLocation(location, location.features[Number(select.value)], "manual");
+          renderUnresolvedLocations(locations);
+          fitPlaceMap(locations);
+          updateMapSummary(locations);
+        });
+        card.append(select, applyButton);
+      } else if (!location.error) {
+        const noResult = document.createElement("p");
+        noResult.textContent = "Kein Treffer gefunden; dieser Ort wird nicht automatisch verortet.";
+        card.append(noResult);
+      }
+      mapUnresolved.append(card);
+    });
+  }
+
+  function fitPlaceMap(locations) {
+    const plotted = locations.filter(function (location) { return location.selectedFeature; });
+    if (!plotted.length || !placeMap) return;
+    const points = plotted.map(function (location) {
+      return [location.selectedFeature.coordinates[1], location.selectedFeature.coordinates[0]];
+    });
+    if (points.length === 1) placeMap.setView(points[0], 8);
+    else placeMap.fitBounds(window.L.latLngBounds(points).pad(0.12), { maxZoom: 10 });
+  }
+
+  function updateMapSummary(locations, serviceError) {
+    const exactMatches = locations.filter(function (location) { return location.matchType === "exact"; }).length;
+    const suggestions = locations.filter(function (location) { return location.matchType === "suggestion"; }).length;
+    const ambiguousSuggestions = locations.filter(function (location) { return location.matchType === "ambiguous"; }).length;
+    const manualMatches = locations.filter(function (location) { return location.matchType === "manual"; }).length;
+    const unresolved = locations.filter(function (location) { return !location.selectedFeature; }).length;
+    mapStatus.textContent = locations.length + " eindeutige Ortsnamen · " + exactMatches +
+      " Namens-Treffer · " + suggestions + " einzelne Vorschläge · " + ambiguousSuggestions +
+      " mehrdeutige Vorschläge (bitte prüfen) · " +
+      manualMatches + " manuell zugeordnet · " + unresolved +
+      " ohne Treffer. Koordinaten sind externe Vorschläge, keine Quelldaten." +
+      (serviceError ? " Ortsdienst-Fehler: " + serviceError : "") +
+      (geocodeCacheNotice ? " " + geocodeCacheNotice : "");
+  }
+
+  async function createPlacesMap(indices, title) {
+    if (!indices.length) return;
+    if (mapRequestController) mapRequestController.abort();
+    const controller = new AbortController();
+    mapRequestController = controller;
+    const generation = ++mapGeneration;
+    mapTitle.textContent = title;
+    mapDialog.showModal();
+    mapStatus.textContent = "Ortsangaben werden vorbereitet …";
+    mapUnresolved.replaceChildren();
+    const locations = collectMapPlaces(indices);
+    if (!locations.length) {
+      mapStatus.textContent = "Für diese Auswahl wurden keine markierten Ortsnennungen und keine Geburts- oder Sterbeorte gefunden.";
+      mapRequestController = null;
+      return;
+    }
+
+    try {
+      const L = await leafletLibrary();
+      if (generation !== mapGeneration) return;
+      initializePlaceMap(L);
+      let completed = 0;
+      let serviceError = "";
+      for (const location of locations) {
+        if (controller.signal.aborted || generation !== mapGeneration) return;
+        if (serviceError) {
+          location.error = "Ortsdienst nicht erreichbar; Suche wurde abgebrochen.";
+          completed += 1;
+          continue;
+        }
+        try {
+          location.features = await fetchPhotonFeatures(location.place, controller.signal);
+          const exactMatches = location.features.filter(function (feature) {
+            return featureMatchesPlace(feature, location.place);
+          });
+          if (exactMatches.length === 1) {
+            plotMapLocation(location, exactMatches[0], "exact");
+          } else if (exactMatches.length > 1) {
+            plotMapLocation(location, exactMatches[0], "ambiguous");
+          } else if (exactMatches.length === 0 && location.features.length === 1) {
+            plotMapLocation(location, location.features[0], "suggestion");
+          }
+        } catch (error) {
+          if (controller.signal.aborted && error.name === "AbortError") return;
+          location.error = error.message || "Ortsdienst nicht erreichbar.";
+          if (error.name === "TypeError" || /Zeitüberschreitung|HTTP (429|5\d\d)/.test(error.message)) {
+            serviceError = location.error;
+          }
+          console.error("Ort konnte nicht verortet werden: " + location.place, error);
+        }
+        completed += 1;
+        mapStatus.textContent = "Orte geprüft: " + completed + " / " + locations.length +
+          (geocodeCacheNotice ? " · " + geocodeCacheNotice : "");
+      }
+      renderUnresolvedLocations(locations);
+      fitPlaceMap(locations);
+      updateMapSummary(locations, serviceError);
+    } catch (error) {
+      if (error.name === "AbortError" || generation !== mapGeneration) return;
+      mapStatus.textContent = "Karte konnte nicht erstellt werden: " + error.message +
+        " Prüfe die Internetverbindung und versuche es erneut.";
+    } finally {
+      if (mapRequestController === controller) mapRequestController = null;
+    }
+  }
+
+  function closePlacesMap() {
+    mapGeneration += 1;
+    if (mapRequestController) mapRequestController.abort();
+    mapRequestController = null;
+    if (mapDialog.open) mapDialog.close();
+  }
+
   function makeCell(text, className) {
     const cell = document.createElement("td");
     if (className) cell.className = className;
@@ -287,6 +775,7 @@
     listEmpty.hidden = visibleIndices.length > 0;
     setText(visibleCount, visibleIndices.length + (visibleIndices.length === 1 ? " Eintrag" : " Einträge"));
     exportButton.disabled = visibleIndices.length === 0;
+    createMapButton.disabled = visibleIndices.length === 0;
     const filterText = searchInput.value.trim() ? " passend zur Suche" : "";
     setRecordsNotice(records.length
       ? visibleIndices.length + " von " + records.length + " Einträgen werden angezeigt" + filterText + "."
@@ -903,6 +1392,22 @@
   importJsonButton.addEventListener("click", function () { importJsonInput.click(); });
   importJsonInput.addEventListener("change", function () { importJsonFile(importJsonInput.files[0]); });
   applyJsonButton.addEventListener("click", applyRecordJson);
+  createMapButton.addEventListener("click", function () {
+    createPlacesMap(visibleIndices, "Orte aus sichtbaren Einträgen");
+  });
+  createPersonMapButton.addEventListener("click", function () {
+    if (selectedIndex < 0 || !records[selectedIndex]) return;
+    createPlacesMap([selectedIndex], "Orte von " + fullName(records[selectedIndex]));
+  });
+  closeMapButton.addEventListener("click", closePlacesMap);
+  mapDialog.addEventListener("click", function (event) {
+    if (event.target === mapDialog) closePlacesMap();
+  });
+  mapDialog.addEventListener("cancel", function () {
+    mapGeneration += 1;
+    if (mapRequestController) mapRequestController.abort();
+    mapRequestController = null;
+  });
   jsonEditor.addEventListener("input", function () {
     try {
       const parsed = JSON.parse(jsonEditor.value);
